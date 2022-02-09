@@ -79,7 +79,7 @@ pose(:,1) = initPose;
 
 %% Simulacion
 
-if verMatlab.Release=='(R2016b)'
+if verMatlab.Release(1:5)=='(R201'
     r = robotics.Rate(1/sampleTime);    %matlab viejo no tiene funcion rateControl
 else
     r = rateControl(1/sampleTime);  %definicion para R2020a, y posiblemente cualquier version nueva
