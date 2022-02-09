@@ -16,7 +16,7 @@ if use_roomba   % si se usa el robot real, se inicializa la conexion
     ipaddress_local = '10.42.0.123';
     setenv('ROS_IP', '10.42.0.123');
     setenv('ROS_MASTER_URI', ['http://', ipaddress, ':11311']);
-    rosinit(ipaddress,11311, 'NodeHost', ipaddress_local)
+    rosinit(ipaddress, 11311, 'NodeHost', ipaddress_local)
     pause(2)
     laserSub = rossubscriber('/scan');
     odomSub = rossubscriber('/odom');
@@ -32,7 +32,7 @@ L = 0.235;                  % Distancia entre ruedas [m]
 dd = DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
 
 %% Creacion del entorno
-load 2021_2c_tp_map.mat     %carga el mapa como occupancyMap en la variable 'map'
+load ../maps/2021_2c_tp_map.mat     %carga el mapa como occupancyMap en la variable 'map'
 
 if verMatlab.Release=='(R2016b)'
     %Para versiones anteriores de MATLAB, puede ser necesario ajustar mapa
@@ -46,12 +46,13 @@ else
 end
 
 %% Crear sensor lidar en simulador
+%% valores en mks
 lidar = LidarSensor;
 lidar.sensorOffset = [.09,0];   % Posicion del sensor en el robot (asumiendo mundo 2D)
-scaleFactor = 10;                %decimar lecturas de lidar acelera el algoritmo
-num_scans = 720/scaleFactor;
+scaleFactor = 1; % original: 10;                %decimar lecturas de lidar acelera el algoritmo
+num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
 lidar.scanAngles = linspace(-pi,pi,num_scans);
-lidar.maxRange = 8;
+lidar.maxRange = 10; % original: 8;
 
 %% Crear visualizacion
 viz = Visualizer2D;
