@@ -36,13 +36,15 @@ load ../maps/2021_2c_tp_map.mat     %carga el mapa como occupancyMap en la varia
 
 if verMatlab.Release=='(R2016b)'
     %Para versiones anteriores de MATLAB, puede ser necesario ajustar mapa
-    imagen_mapa = 1-double(imread('imagen_2021_2c_mapa_tp.tiff'))/255;
+    imagen_mapa = 1-double(imread('../pics/maps/imagen_2021_2c_mapa_tp.tiff'))/255;
     map = robotics.OccupancyGrid(imagen_mapa, 25);
 elseif verMatlab.Release(1:5)=='(R201'    % Completar con la version que tengan
     %Ni idea que pasa
-    disp('ver si la compatibilidad R2016b funciona');
-else
+    disp('ver si la compatibilidad de not R2016b, R2019a o R2020a funciona');
+elseif verMatlab.Release == '(R2019a)'
     disp(['Utilizando MATLAB ', verMatlab.Release]);
+    imagen_mapa = 1-double(imread('../pics/maps/imagen_2021_2c_mapa_tp.tiff'))/255;
+    map = robotics.OccupancyGrid(imagen_mapa, 25);
 end
 
 %% Crear sensor lidar en simulador
@@ -74,8 +76,6 @@ wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
 wRef(tVec < 5) = -0.2;
 wRef(tVec >=7.5) = 0.2;
 
-
-%% ACA creemos que deberiamos hacer una markov localization.
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
 
@@ -89,31 +89,55 @@ end
 
 
 %% belief
-bel = (map.getOccupancy <= map.FreeThreshold); % celdas libres como 1, celdas ocupadas como 0.
-n_freecells = sum(sum(bel));
-bel = bel / n_freecells; % inicializamos los valores de belief del robot en las celdas libres, como una uniforme de 1/n siendo n la cantidad de celdas libres
+% vamos a tener que cambiar el belief porque existen beliefs para cada
+% angulo de pose, que no tuvimos en cuenta. ese angulo tendra que ser
+% considerado desde -pi a pi con un paso igual a la cantidad de puntos del
+% LIDAR del robot. la forma matricial seria tener un tensor en el que cada
+% capa es un angulo distinto para todas las posiciones posibles del robot.
+%
+% bel(:,:,1) correspondiente al angulo -pi para celdas...
+%       /                                                   \
+%      | bel(celda[1 1]) bel(celda[1 2]) ... bel(celda[1 n]) |
+%      |       ...            ...                 ...        |
+%      | bel(celda[m 1]) bel(celda[m 2]) ... bel(celda[m n]) |
+%       \                                                   /
+%
+% bel(:,:,2) correspondiente al angulo -pi + step_LIDAR para celdas...
+%       /                                                   \
+%      | bel(celda[1 1]) bel(celda[1 2]) ... bel(celda[1 n]) |
+%      |       ...            ...                 ...        |
+%      | bel(celda[m 1]) bel(celda[m 2]) ... bel(celda[m n]) |
+%       \                                                   /
+%
+% y asi sigue...
+
+% celdas libres como 1, celdas ocupadas como 0.
+bel = (map.occupancyMatrix <= map.FreeThreshold);
+
+% esto lo repetimos por la resolucion del LIDAR
+% bel = repmat(bel, [1 1 LIDAR_resolution]);
+
+n_freecells = sum(sum(bel)); % n_freecells = sum(sum(sum(bel,3),2),1);
+
+% inicializamos los valores de belief del robot en las celdas libres,
+% como una uniforme de 1/n siendo n la cantidad de celdas libres
+bel = bel / n_freecells; 
 
 for idx = 2:numel(tVec)   
 
     % Generar aqui criteriosamente velocidades lineales v_cmd y angulares w_cmd
     % -0.5 <= v_cmd <= 0.5 and -4.25 <= w_cmd <= 4.25
     % (mantener las velocidades bajas (v_cmd < 0.1) (w_cmd < 0.5) minimiza vibraciones y
-    % mejora las mediciones.   
+    % mejora las mediciones.
 
-    while (localizado == False):
-        % o movimientos que digamos nosotros para lograr una pose "conocida", con probabilidad alta.. algo asi.
-        v = 0;
-        w = 0;
-
-
-    
     v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
     w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
     
     %% TO DO
         % generar velocidades para este timestep
         % A*, veo que cell sigue y pongo v y w para moverme a esa celda (al centro...)
-        % aca vamos a usar una pose "mejorada" en la iteracion anterior, por las mediciones que obtuvimos del LIDAR
+        % aca vamos a usar una pose "mejorada" en la iteracion anterior, 
+        % por las mediciones que obtuvimos del LIDAR
         % jugar con acceleraciones y momento
         % fin del TO DO
     
@@ -165,13 +189,16 @@ for idx = 2:numel(tVec)
     % variables ranges la medicion del lidar para ser usada.
     
     %% TO DO
-    %pose(:, idx) 
         % hacer algo con la medicion del lidar (ranges) y con el estado
-        % actual de la odometria ( pose(:,idx) ) MEJORAR la pose, iterando la misma con este cloud points obtenido por el LIDAR.
+        % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
+        % iterando la misma con este cloud points obtenido por el LIDAR.
         % 
 
-        %% Update belief through markov localization
-        bel = markov_loc(bel, z);
+        % Update belief mediante markov localization, if localized = false
+        % lo haremos aca pq necesitamos las mediciones del LIDAR.
+        % bel = markov_loc(bel, z);
+        % if var(belief) > threshold then localized = true y nunca vuelve a
+        % localizarse a menos que se vuelva a perder.
         
         % Fin del TO DO
         
