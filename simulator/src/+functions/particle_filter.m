@@ -1,4 +1,4 @@
-function [particles] = particle_filter(n_particles, u, z)
+function [best_pose] = particle_filter(n_particles, u, z, timestep)
 %PARTICLE_FILTER Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -7,14 +7,16 @@ function [particles] = particle_filter(n_particles, u, z)
     % CHEQUEAR QUE FINAL STEP USAMOS
     %final_step = size(data.timestep, 2);
     %final_step = 50;
-    for t = 1:final_step
-        new_particles = sample_motion_model(u, particles);
+	for t = 1:final_step
+        new_particles = sample_motion_model(u, particles, timestep);
 
         weights = measurement_model(z, new_particles, map);
         normalizer = sum(weights);
         weights = weights ./ normalizer;
         particles = resample(new_particles, weights);
-    end
+	end
+	
+	best_pose = mean(particles,1);
     
 end
 

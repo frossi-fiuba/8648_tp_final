@@ -5,7 +5,7 @@ clear all
 
 verMatlab= ver('MATLAB');   % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
 
-simular_ruido_lidar = false; %simula datos no validos del lidar real, probar si se la banca
+simular_ruido_lidar = true; %simula datos no validos del lidar real, probar si se la banca
 use_roomba=false;  % false para desarrollar usando el simulador, true para conectarse al robot real
 
 % Roomba
@@ -38,13 +38,13 @@ if verMatlab.Release=='(R2016b)'
     %Para versiones anteriores de MATLAB, puede ser necesario ajustar mapa
     imagen_mapa = 1-double(imread('../pics/maps/imagen_2021_2c_mapa_tp.tiff'))/255;
     map = robotics.OccupancyGrid(imagen_mapa, 25);
+elseif verMatlab.Release(1:5)=='(R201'    % Completar con la version que tengan
+    %Ni idea que pasa
+    disp('ver si la compatibilidad de not R2016b, R2019a o R2020a funciona');
 elseif verMatlab.Release == '(R2019a)'
     disp(['Utilizando MATLAB ', verMatlab.Release]);
     imagen_mapa = 1-double(imread('../pics/maps/imagen_2021_2c_mapa_tp.tiff'))/255;
     map = robotics.OccupancyGrid(imagen_mapa, 25);
-else
-    %Ni idea que pasa
-    disp('ver si la compatibilidad de not R2016b, R2019a o R2020a funciona');
 end
 
 % Crear sensor lidar en simulador
@@ -96,7 +96,7 @@ end
 % capa es un angulo distinto para todas las posiciones posibles del robot.
 %
 % bel(:,:,1) correspondiente al angulo -pi para celdas...
-%       /													\
+%       /                                                   \
 %      | bel(celda[1 1]) bel(celda[1 2]) ... bel(celda[1 n]) |
 %      |       ...            ...                 ...        |
 %      | bel(celda[m 1]) bel(celda[m 2]) ... bel(celda[m n]) |
@@ -133,7 +133,7 @@ for idx = 2:numel(tVec)
     v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
     w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
     
-    % TO DO
+    %% TO DO
         % generar velocidades para este timestep
         % A*, veo que cell sigue y pongo v y w para moverme a esa celda (al centro...)
         % aca vamos a usar una pose "mejorada" en la iteracion anterior, 
@@ -141,7 +141,7 @@ for idx = 2:numel(tVec)
         % jugar con acceleraciones y momento
         % fin del TO DO
     
-    % a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
+    %% a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
     
     if use_roomba       % para usar con el robot real
         
@@ -150,7 +150,7 @@ for idx = 2:numel(tVec)
         cmdMsg.Angular.Z = w_cmd;
         send(cmdPub,cmdMsg);
         
-        % Recibir datos de lidar y odometria
+        % Recibir datos de lidar y odometría
         scanMsg = receive(laserSub);
         odompose = odomSub.LatestMessage;
         
@@ -159,12 +159,11 @@ for idx = 2:numel(tVec)
         ranges = ranges_full(1:scaleFactor:end);
         ranges = circshift(ranges,length(ranges)/2);  % verificar
         ranges(ranges==0)=NaN; % lecturas erroneas y maxrange
-        % Obtener pose del robot [x,y,yaw] de datos de odometria (integrado por encoders).
+        % Obtener pose del robot [x,y,yaw] de datos de odometría (integrado por encoders).
         odomQuat = [odompose.Pose.Pose.Orientation.W, odompose.Pose.Pose.Orientation.X, ...
         odompose.Pose.Pose.Orientation.Y, odompose.Pose.Pose.Orientation.Z];
         odomRotation = quat2eul(odomQuat);
-        pose(:,idx) = [odompose.Pose.Pose.Position.X + initPose(1);...
-			odompose.Pose.Pose.Position.Y + initPose(2); odomRotation(1)];
+        pose(:,idx) = [odompose.Pose.Pose.Position.X + initPose(1); odompose.Pose.Pose.Position.Y + initPose(2); odomRotation(1)];
     
     else        % para usar el simulador
    
@@ -185,11 +184,11 @@ for idx = 2:numel(tVec)
             ranges(not_valid<=chance_de_medicion_no_valida)=NaN;
         end
     end
-    %
-    % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
+    %%
+    % Aca el robot ya ejecutó las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
     
-    % TO DO
+    %% TO DO
         % hacer algo con la medicion del lidar (ranges) y con el estado
         % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
         % iterando la misma con este cloud points obtenido por el LIDAR.
@@ -203,7 +202,7 @@ for idx = 2:numel(tVec)
         
         % Fin del TO DO
         
-    %
+    %%
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
     waitfor(r);

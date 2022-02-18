@@ -24,19 +24,15 @@ function weight = measurement_model(z, x, map)
 	% convierto de tensor a matriz
 	dist = reshape(dist, [size(dist,1), size(dist,3), size(dist,2)]);
     
-	% pasaje de coordenadas y gaussiana
-	
-% 	for i = 1:size(z, 2)
-%         landmark_position = [l(z(i).id).x, l(z(i).id).y];
-%         measurement_range = [z(i).range];
-% 		
-% 		% mean of normal distribution
-%         real_distance = vecnorm((x_-landmark_position),2,2);
-%         
-% 		% likelihood of getting the measured range
-%         weight = weight.*normpdf(measurement_range, real_distance, sigma);
-% 	end
-	
+    for i = 1:size(z, 2)
+        landmark_position = [l(z(i).id).x, l(z(i).id).y];
+        measurement_range = [z(i).range];
+		
+		% mean of Normal distribution
+        real_distance = vecnorm((x_ - landmark_position),2,2);
+        
+		% likelihood of getting the measured range
+        weight = weight.*normpdf(measurement_range, real_distance, sigma);
+    end
     weight = weight ./ size(z, 2);
-	
 end
