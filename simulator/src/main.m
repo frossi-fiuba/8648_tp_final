@@ -5,7 +5,7 @@ clear all
 
 % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
 verMatlab= ver('MATLAB');
-addpath('D:\drive-lmendoza\_86.48 Seminario I - Robótica Móvil\8648_tp_final\simulator\src\functions');
+addpath('D:\Documentos\Fiuba\2C2021\Robotica_Movil\TPFinal\8648_tp_final\simulator\src\functions');
 
 % simula datos no validos del lidar real, probar si se la banca
 simular_ruido_lidar = false;
@@ -64,12 +64,13 @@ lidar.maxRange = 10; % original: 8;
 viz = Visualizer2D;
 viz.mapName = 'map';
 attachLidarSensor(viz,lidar);
-
+%%
 % Parametros de la Simulacion
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [2; 2.5; -pi/2];         % Pose inicial (x y theta) del robot simulado
+initPose = [4.5; 3.5; -pi/2];         % Pose inicial (x y theta) del robot simulado
+initPose = [2; 2.5; -pi/2];   
 % (el robot pude arrancar en cualquier lugar valido del mapa)
 
 % Inicializar vectores de tiempo, entrada y pose
@@ -80,12 +81,13 @@ vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
 wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
 wRef(tVec < 5) = -0.2;
 wRef(tVec >=7.5) = 0.2;
+wRef(tVec >= 20) = -0.1;
 
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
 
-n_particles = 500;
-
+n_particles = 600;
+old_best_pose = zeros(1,3);
 %% Simulacion
 
 if verMatlab.Release(1:5)=='(R201'
@@ -129,6 +131,8 @@ end
 % inicializamos los valores de belief del robot en las celdas libres,
 % como una uniforme de 1/n siendo n la cantidad de celdas libres
 %bel = bel / n_freecells; 
+
+
 
 for idx = 2:numel(tVec)   
 
@@ -203,7 +207,7 @@ for idx = 2:numel(tVec)
         % hacer algo con la medicion del lidar (ranges) y con el estado
         % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
         % iterando la misma con este cloud points obtenido por el LIDAR.
-		
+	
 		if (idx == 2)
 			particles = initialize_particles(n_particles,map);
 		else
@@ -212,11 +216,19 @@ for idx = 2:numel(tVec)
 				sampleTime, map);
 			best_pose = weights'*particles;
 			disp(best_pose);
+			if(size(unique(particles, 'row'),1) < 20) 
+				disp("entre al gaussiano")
+				n_particles = 200;
+				particles = best_pose + mvnrnd([0,0,0],diag([0.05,0.05,0.2]), n_particles);
+			end
 		end
-        % hacer regeneracion de particulas cerca de la media para mejorar
-        % la precision de la estimacion.
-		
-        % Fin del TO DO
+	% agregar una variable que indique que se localizó el robot, a partir
+	% de cierto tiempo?? o cuando se vuelve a remuestrear la gaussiana
+    % Fin del TO DO
+	
+	% TO DO: A*
+		% Solamente si todavía no se hizo
+		%path_planning()
         
     % actualizar visualizacion
     viz(pose(:,idx),ranges)

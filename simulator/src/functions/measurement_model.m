@@ -16,15 +16,19 @@ function weight = measurement_model(z_r, z_theta, lidar_maxRange, x, map)
 	% forma optima (explicado en la pagina 7 del Jamboard)
 	x_tensor = repmat(reshape(x(:,1:2)',[1,2,size(x, 1)]),[length(z_theta),1,1]);
 	
+	
+	% esto tarda 3.7 segundos en correr, no se puede hacer matriz por la
+	% función en sí. No se pueden usar menos particulas porque no converge.
 	for i = 1:size(x, 1)
 		% sumamos pi y corremos los puntos que se tracean
 		% para compensar el cambio de coordenadas entre el lidar
-		% y el robot.		
+		% y el robot.
+
 		intersects(:,:,i) = rayIntersection(map, x(i,:)+[0.09*cos(x(i,3)),0.09*sin(x(i,3)),0],...
 			z_theta, lidar_maxRange);
 		
 		NaN_idx = find(~isnan(intersects(:,1,i)));
-		
+
 		clean_intersects = intersects(NaN_idx,:,i);
 		
 		clean_xtensor = x_tensor(NaN_idx,:,i);

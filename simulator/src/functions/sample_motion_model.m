@@ -17,7 +17,6 @@ function new_pose = sample_motion_model(dd, v_cmd, w_cmd, pose, timestep)
 % 	dw = w*timestep;
 
 	new_pose = zeros(size(pose));
-
 	% Mover el robot segun los comandos generados
 	[wL,wR] = inverseKinematics(dd,v_cmd,w_cmd);
 	% Velocidad resultante
