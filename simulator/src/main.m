@@ -3,10 +3,14 @@
 close all
 clear all
 
-verMatlab= ver('MATLAB');   % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
+% en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
+verMatlab= ver('MATLAB');
+addpath('D:\drive-lmendoza\_86.48 Seminario I - Robótica Móvil\8648_tp_final\simulator\src\functions');
 
-simular_ruido_lidar = false; %simula datos no validos del lidar real, probar si se la banca
-use_roomba=false;  % false para desarrollar usando el simulador, true para conectarse al robot real
+% simula datos no validos del lidar real, probar si se la banca
+simular_ruido_lidar = false;
+% false para desarrollar usando el simulador, true para conectarse al robot real
+use_roomba=false;
 
 % Roomba
 if use_roomba   % si se usa el robot real, se inicializa la conexion    
@@ -27,8 +31,8 @@ end
     
 
 % Definicion del robot (disco de diametro = 0.35m)
-R = 0.072/2;                % Radio de las ruedas [m]
-L = 0.235;                  % Distancia entre ruedas [m]
+R = 0.072/2;  % Radio de las ruedas [m]
+L = 0.235;  % Distancia entre ruedas [m]
 dd = DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
 
 % Creacion del entorno
@@ -51,7 +55,7 @@ end
 % valores en mks
 lidar = LidarSensor;
 lidar.sensorOffset = [.09,0];   % Posicion del sensor en el robot (asumiendo mundo 2D)
-scaleFactor = 1; % original: 10;                %decimar lecturas de lidar acelera el algoritmo
+scaleFactor = 1; % original: 10; %decimar lecturas de lidar acelera el algoritmo
 num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
 lidar.scanAngles = linspace(-pi,pi,num_scans);
 lidar.maxRange = 10; % original: 8;
@@ -65,7 +69,8 @@ attachLidarSensor(viz,lidar);
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [2; 2.5; -pi/2];         % Pose inicial (x y theta) del robot simulado (el robot pude arrancar en cualquier lugar valido del mapa)
+initPose = [2; 2.5; -pi/2];         % Pose inicial (x y theta) del robot simulado
+% (el robot pude arrancar en cualquier lugar valido del mapa)
 
 % Inicializar vectores de tiempo, entrada y pose
 tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion total
@@ -78,6 +83,8 @@ wRef(tVec >=7.5) = 0.2;
 
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
+
+n_particles = 500;
 
 %% Simulacion
 
@@ -112,16 +119,16 @@ end
 % y asi sigue...
 
 % celdas libres como 1, celdas ocupadas como 0.
-bel = (map.occupancyMatrix <= map.FreeThreshold);
+%bel = (map.occupancyMatrix <= map.FreeThreshold);
 
 % esto lo repetimos por la resolucion del LIDAR
 % bel = repmat(bel, [1 1 LIDAR_resolution]);
 
-n_freecells = sum(sum(bel)); % n_freecells = sum(sum(sum(bel,3),2),1);
+%n_freecells = sum(sum(bel)); % n_freecells = sum(sum(sum(bel,3),2),1);
 
 % inicializamos los valores de belief del robot en las celdas libres,
 % como una uniforme de 1/n siendo n la cantidad de celdas libres
-bel = bel / n_freecells; 
+%bel = bel / n_freecells; 
 
 for idx = 2:numel(tVec)   
 
@@ -132,6 +139,8 @@ for idx = 2:numel(tVec)
 
     v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
     w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+	% empezar con velocidades relacionadas a que mida el lidar asi no se
+	% choca pero puede explorar
     
     % TO DO
         % generar velocidades para este timestep
@@ -173,7 +182,8 @@ for idx = 2:numel(tVec)
         % Velocidad resultante
         [v,w] = forwardKinematics(dd,wL,wR);
         velB = [v;0;w]; % velocidades en la terna del robot [vx;vy;w]
-        vel = bodyToWorld(velB,pose(:,idx-1));  % Conversion de la terna del robot a la global
+		% Conversion de la terna del robot a la global
+        vel = bodyToWorld(velB,pose(:,idx-1));
         % Realizar un paso de integracion
         pose(:,idx) = pose(:,idx-1) + vel*sampleTime; 
         % Tomar nueva medicion del lidar
@@ -193,19 +203,27 @@ for idx = 2:numel(tVec)
         % hacer algo con la medicion del lidar (ranges) y con el estado
         % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
         % iterando la misma con este cloud points obtenido por el LIDAR.
-        % 
-
-        % Update belief mediante markov localization, if localized = false
-        % lo haremos aca pq necesitamos las mediciones del LIDAR.
-        % bel = markov_loc(bel, z);
-        % if var(belief) > threshold then localized = true y nunca vuelve a
-        % localizarse a menos que se vuelva a perder.
-        
+		
+		if (idx == 2)
+			particles = initialize_particles(n_particles,map);
+		else
+			[particles, weights] = particle_filter(particles,...
+				dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
+				sampleTime, map);
+			best_pose = weights'*particles;
+			disp(best_pose);
+		end
+        % hacer regeneracion de particulas cerca de la media para mejorar
+        % la precision de la estimacion.
+		
         % Fin del TO DO
         
-    %
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
+	if(idx >= 3)
+		delete(s1);
+	end
+	figure(1); hold on; s1 = scatter(particles(:,1),particles(:,2));
     waitfor(r);
 end
 
