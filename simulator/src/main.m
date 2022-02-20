@@ -5,7 +5,7 @@ clear all
 
 % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
 verMatlab= ver('MATLAB');
-addpath('D:\Documentos\Fiuba\2C2021\Robotica_Movil\TPFinal\8648_tp_final\simulator\src\functions');
+
 
 % simula datos no validos del lidar real, probar si se la banca
 simular_ruido_lidar = false;
@@ -33,7 +33,7 @@ end
 % Definicion del robot (disco de diametro = 0.35m)
 R = 0.072/2;  % Radio de las ruedas [m]
 L = 0.235;  % Distancia entre ruedas [m]
-dd = DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
+dd = base.DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
 
 % Creacion del entorno
 load ../maps/2021_2c_tp_map.mat     %carga el mapa como occupancyMap en la variable 'map'
@@ -53,7 +53,7 @@ end
 
 % Crear sensor lidar en simulador
 % valores en mks
-lidar = LidarSensor;
+lidar = base.LidarSensor;
 lidar.sensorOffset = [.09,0];   % Posicion del sensor en el robot (asumiendo mundo 2D)
 scaleFactor = 1; % original: 10; %decimar lecturas de lidar acelera el algoritmo
 num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
@@ -61,7 +61,7 @@ lidar.scanAngles = linspace(-pi,pi,num_scans);
 lidar.maxRange = 10; % original: 8;
 
 % Crear visualizacion
-viz = Visualizer2D;
+viz = base.Visualizer2D;
 viz.mapName = 'map';
 attachLidarSensor(viz,lidar);
 %%
@@ -187,7 +187,7 @@ for idx = 2:numel(tVec)
         [v,w] = forwardKinematics(dd,wL,wR);
         velB = [v;0;w]; % velocidades en la terna del robot [vx;vy;w]
 		% Conversion de la terna del robot a la global
-        vel = bodyToWorld(velB,pose(:,idx-1));
+        vel = base.bodyToWorld(velB,pose(:,idx-1));
         % Realizar un paso de integracion
         pose(:,idx) = pose(:,idx-1) + vel*sampleTime; 
         % Tomar nueva medicion del lidar
@@ -209,9 +209,9 @@ for idx = 2:numel(tVec)
         % iterando la misma con este cloud points obtenido por el LIDAR.
 	
 		if (idx == 2)
-			particles = initialize_particles(n_particles,map);
+			particles = pf.initialize_particles(n_particles,map);
 		else
-			[particles, weights] = particle_filter(particles,...
+			[particles, weights] = pf.particle_filter(particles,...
 				dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
 				sampleTime, map);
 			best_pose = weights'*particles;
@@ -222,12 +222,12 @@ for idx = 2:numel(tVec)
 				particles = best_pose + mvnrnd([0,0,0],diag([0.05,0.05,0.2]), n_particles);
 			end
 		end
-	% agregar una variable que indique que se localizó el robot, a partir
+	% agregar una variable que indique que se localizï¿½ el robot, a partir
 	% de cierto tiempo?? o cuando se vuelve a remuestrear la gaussiana
     % Fin del TO DO
 	
 	% TO DO: A*
-		% Solamente si todavía no se hizo
+		% Solamente si todavï¿½a no se hizo
 		%path_planning()
         
     % actualizar visualizacion

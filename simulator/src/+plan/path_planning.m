@@ -2,7 +2,7 @@ function cells = path_planning(map, start, goal)
 	% start y goal tienen que ser del mundo.
 	
 	% mapa:
-	viz = Visualizer2D;
+	viz = base.Visualizer2D;
 	viz.mapName = 'map';
 	viz(start);
 	viz([goal,0]');
@@ -70,15 +70,15 @@ function cells = path_planning(map, start, goal)
 		viz([grid2world(map, [parent_x, parent_y]), 0]);
 		
 		% neighbors de los parents
-		n = neighbors([parent_y, parent_x], map_size);
+		n = plan.neighbors([parent_y, parent_x], map_size);
 		for i=1:size(n,1)
 			child_y = n(i,1);
 			child_x = n(i,2);
 			child = [child_x, child_y];
 
 			% calculo el costo de llegar a la celda child
-			cost_val = costs(parent_y,parent_x) + edge_cost(parent, child, map);
-			heuristic_val = heuristic(child, goal, speed);
+			cost_val = costs(parent_y,parent_x) + plan.edge_cost(parent, child, map);
+			heuristic_val = plan.heuristic(child, goal, speed);
 
 			%update cost of cell
 			if cost_val < costs(child_y,child_x)

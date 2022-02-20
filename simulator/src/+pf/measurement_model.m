@@ -18,7 +18,7 @@ function weight = measurement_model(z_r, z_theta, lidar_maxRange, x, map)
 	
 	
 	% esto tarda 3.7 segundos en correr, no se puede hacer matriz por la
-	% función en sí. No se pueden usar menos particulas porque no converge.
+	% funciï¿½n en sï¿½. No se pueden usar menos particulas porque no converge.
 	for i = 1:size(x, 1)
 		% sumamos pi y corremos los puntos que se tracean
 		% para compensar el cambio de coordenadas entre el lidar

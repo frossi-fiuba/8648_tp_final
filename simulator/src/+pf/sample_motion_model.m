@@ -25,7 +25,7 @@ function new_pose = sample_motion_model(dd, v_cmd, w_cmd, pose, timestep)
 
 	for i=1:size(pose,1)
 		% Conversion de la terna del robot a la global
-		vel = bodyToWorld(velB,pose(i,:));
+		vel = base.bodyToWorld(velB,pose(i,:));
 		% Realizar un paso de integracion
 		new_pose(i,:) = pose(i,:) + vel'*timestep;
 	end
