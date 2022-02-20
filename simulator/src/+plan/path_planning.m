@@ -1,8 +1,8 @@
-function cells = path_planning(map, start, goal)
+function path = path_planning(map, start, goal)
 	% start y goal tienen que ser del mundo.
 	
 	% mapa:
-	viz = base.Visualizer2D;
+	viz = Visualizer2D;
 	viz.mapName = 'map';
 	viz(start);
 	viz([goal,0]');
@@ -70,15 +70,15 @@ function cells = path_planning(map, start, goal)
 		viz([grid2world(map, [parent_x, parent_y]), 0]);
 		
 		% neighbors de los parents
-		n = plan.neighbors([parent_y, parent_x], map_size);
+		n = neighbors([parent_y, parent_x], map_size);
 		for i=1:size(n,1)
 			child_y = n(i,1);
 			child_x = n(i,2);
 			child = [child_x, child_y];
 
 			% calculo el costo de llegar a la celda child
-			cost_val = costs(parent_y,parent_x) + plan.edge_cost(parent, child, map);
-			heuristic_val = plan.heuristic(child, goal, speed);
+			cost_val = costs(parent_y,parent_x) + edge_cost(parent, child, map);
+			heuristic_val = heuristic(child, goal, speed);
 
 			%update cost of cell
 			if cost_val < costs(child_y,child_x)
@@ -97,6 +97,11 @@ function cells = path_planning(map, start, goal)
 	% draw the path as blue dots
 	parent = [goal_y, goal_x];
 	distance2 = 0;
+	
+	j=1;
+	path = zeros(prod(map_size), 2);
+	path(1,:) = start;
+	
 	while previous_x(parent(1), parent(2))>=0
 		viz([grid2world(map,[parent(2), parent(1)]),0]);
 		viz([grid2world(map,goal),0]);
@@ -105,20 +110,19 @@ function cells = path_planning(map, start, goal)
 	% 	if(parent(1) == goal_y && parent(2) == goal_x)
 	% 		plot(grid2world(map,[goal(2), goal(1)]), 'g.');
 	% 	end
-
+		j = j+1;
 		child_y = previous_y(parent(1), parent(2));
 		child_x = previous_x(parent(1), parent(2));
 		child = [child_y, child_x];
+		path(j,:) = child;
 		distance2 = distance2+norm(parent - child);
 		parent = child;
 		pause(0.05); %pause for visualization
 	end
-
+	
+	path = path(1:distance2, :);
 	disp 'done'
 	disp 'path cost: ', disp(costs(goal(2),goal(1)));
 	disp 'path length: ', disp(distance2);
 	disp 'number of nodes visited: ', disp(sum(closed_list(:)));
-	cells = [previous_x, previous_y];
 end
-
-
