@@ -23,7 +23,7 @@ function path = path_planning(map, start, goal)
 	
 	% costo estimado al goal
 	heuristics = zeros(map_size);
-	speed = 3; % velocidad de la heuristica
+	speed = 2; % velocidad de la heuristica
 	
 	% celdas que fueron visitadas
 	closed_list = zeros(map_size);
@@ -90,7 +90,7 @@ function path = path_planning(map, start, goal)
 			  previous_y(child_y,child_x) = parent_y;
 			end
 		end
-		pause(0.05); % para visualizar, comentar
+		pause(0.05); % para no visualizar, comentar
 	end
 	
 	% visualization: from the goal to the start,
