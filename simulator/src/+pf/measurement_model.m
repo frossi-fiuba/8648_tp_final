@@ -23,8 +23,10 @@ function weight = measurement_model(z_r, z_theta, lidar_maxRange, x, map)
 		% sumamos pi y corremos los puntos que se tracean
 		% para compensar el cambio de coordenadas entre el lidar
 		% y el robot.
-
-		intersects(:,:,i) = rayIntersection(map, x(i,:)+[0.09*cos(x(i,3)),0.09*sin(x(i,3)),0],...
+		lidar_offset = [0.09, 0, 0] % from the robot perspective, in meters
+		%lidar_offset = [0.09*cos(x(i,3)),0.09*sin(x(i,3)),0] % in meters 
+		
+		intersects(:,:,i) = rayIntersection(map, x(i,:) + lidar_offset,...
 			z_theta, lidar_maxRange);
 		
 		NaN_idx = find(~isnan(intersects(:,1,i)));
@@ -32,7 +34,7 @@ function weight = measurement_model(z_r, z_theta, lidar_maxRange, x, map)
 		clean_intersects = intersects(NaN_idx,:,i);
 		
 		clean_xtensor = x_tensor(NaN_idx,:,i);
-		
+		% https://www.mathworks.com/help/robotics/ref/binaryoccupancymap.rayintersection.html con respecto del mapa lo devuelve entonces es -clean_xtensro?
 		clean_dist = sqrt(sum((clean_intersects-clean_xtensor).^2,2));
 		
 		% computo distancias entre poses de particulas y sus proyecciones
