@@ -6,6 +6,6 @@ function cost = edge_cost(parent, child, map)
     dist = sqrt(sum((parent - child).^2));
     cost = dist + prob;
   else
-     cost = inf;s
+     cost = inf;
   end
 end

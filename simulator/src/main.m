@@ -55,7 +55,7 @@ end
 % valores en mks
 lidar = base.LidarSensor;
 lidar.sensorOffset = [.09,0];   % Posicion del sensor en el robot (asumiendo mundo 2D)
-scaleFactor = 1; % original: 10; %decimar lecturas de lidar acelera el algoritmo
+scaleFactor = 2; % original: 10; %decimar lecturas de lidar acelera el algoritmo
 num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
 lidar.scanAngles = linspace(-pi,pi,num_scans);
 lidar.maxRange = 10; % original: 8;
@@ -69,8 +69,8 @@ attachLidarSensor(viz,lidar);
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [4.5; 3.5; -pi/2];         % Pose inicial (x y theta) del robot simulado
-initPose = [2; 2.5; -pi/2];   
+initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
+%initPose = [4.5; 3.5; -pi/2]; 
 % (el robot pude arrancar en cualquier lugar valido del mapa)
 
 % Inicializar vectores de tiempo, entrada y pose
@@ -228,7 +228,7 @@ for idx = 2:numel(tVec)
 	
 	% TO DO: A*
 		% Solamente si todav�a no se hizo
-		%path_planning()
+		% path_to_a = plan.path_planning(map, best_pose, A);
         
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
