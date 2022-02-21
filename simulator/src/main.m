@@ -86,7 +86,7 @@ wRef(tVec >= 20) = -0.1;
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
 
-n_particles = 100;
+n_particles = 180;
 old_best_pose = zeros(1,3);
 %% Simulacion
 
@@ -96,66 +96,25 @@ else
     r = rateControl(1/sampleTime);  %definicion para R2020a, y posiblemente cualquier version nueva
 end
 
-
-% belief
-% vamos a tener que cambiar el belief porque existen beliefs para cada
-% angulo de pose, que no tuvimos en cuenta. ese angulo tendra que ser
-% considerado desde -pi a pi con un paso igual a la cantidad de puntos del
-% LIDAR del robot. la forma matricial seria tener un tensor en el que cada
-% capa es un angulo distinto para todas las posiciones posibles del robot.
-%
-% bel(:,:,1) correspondiente al angulo -pi para celdas...
-%       /													\
-%      | bel(celda[1 1]) bel(celda[1 2]) ... bel(celda[1 n]) |
-%      |       ...            ...                 ...        |
-%      | bel(celda[m 1]) bel(celda[m 2]) ... bel(celda[m n]) |
-%       \                                                   /
-%
-% bel(:,:,2) correspondiente al angulo -pi + step_LIDAR para celdas...
-%       /                                                   \
-%      | bel(celda[1 1]) bel(celda[1 2]) ... bel(celda[1 n]) |
-%      |       ...            ...                 ...        |
-%      | bel(celda[m 1]) bel(celda[m 2]) ... bel(celda[m n]) |
-%       \                                                   /
-%
-% y asi sigue...
-
-% celdas libres como 1, celdas ocupadas como 0.
-%bel = (map.occupancyMatrix <= map.FreeThreshold);
-
-% esto lo repetimos por la resolucion del LIDAR
-% bel = repmat(bel, [1 1 LIDAR_resolution]);
-
-%n_freecells = sum(sum(bel)); % n_freecells = sum(sum(sum(bel,3),2),1);
-
-% inicializamos los valores de belief del robot en las celdas libres,
-% como una uniforme de 1/n siendo n la cantidad de celdas libres
-%bel = bel / n_freecells; 
-
-regen_rate = 20; % cantidad de particulas unicas para regenerar
-regen_spread = [0.05,0.05,0.2];
-var_momentum = 0.95;
-
+regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
+momentum = 0.9;
+localized = false;
 
 for idx = 2:numel(tVec)   
 
-    % Generar aqui criteriosamente velocidades lineales v_cmd y angulares w_cmd
-    % -0.5 <= v_cmd <= 0.5 and -4.25 <= w_cmd <= 4.25
-    % (mantener las velocidades bajas (v_cmd < 0.1) (w_cmd < 0.5) minimiza vibraciones y
-    % mejora las mediciones.
-
+    % velocidades iniciales
     v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
     w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
 	% empezar con velocidades relacionadas a que mida el lidar asi no se
 	% choca pero puede explorar
     
     % TO DO
-        % generar velocidades para este timestep
-        % A*, veo que cell sigue y pongo v y w para moverme a esa celda (al centro...)
-        % aca vamos a usar una pose "mejorada" en la iteracion anterior, 
-        % por las mediciones que obtuvimos del LIDAR
-        % jugar con acceleraciones y momento
-        % fin del TO DO
+    % generar velocidades para este timestep
+    % A*, veo que cell sigue y pongo v y w para moverme a esa celda (al centro...)
+    % aca vamos a usar una pose "mejorada" en la iteracion anterior, 
+    % por las mediciones que obtuvimos del LIDAR
+    % jugar con acceleraciones y momento
+    % fin del TO DO
     
     % a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
     
@@ -206,31 +165,36 @@ for idx = 2:numel(tVec)
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
     
-    % TO DO
-        % hacer algo con la medicion del lidar (ranges) y con el estado
-        % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
-        % iterando la misma con este cloud points obtenido por el LIDAR.
-		
-		if (idx == 2)
-			particles = pf.initialize_particles(n_particles,map);
-			best_pose = mean(particles,1);
-		else
-			[particles, weights] = pf.particle_filter(particles,...
-				dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
-				regen_rate, regen_spread, sampleTime, map);
-			best_pose = weights'*particles;
-			disp(best_pose);
-			if(min(regen_spread) > 0.01)
-				regen_spread = var_momentum*regen_spread;
-			end
-		end
-	% agregar una variable que indique que se localiz� el robot, a partir
-	% de cierto tiempo?? o cuando se vuelve a remuestrear la gaussiana
+    % si esta deslocalizado se ejecuta un filtro de particulas, si esta
+    % localizado se actualiza esa pose estimada con el modelo de odometría,
+    % deberiamos usar EKF o algo menos exigente para seguir corrigiendo la
+    % estimacion.
+    if (idx == 2)
+        particles = pf.initialize_particles(n_particles,map);
+        regen_spread = var(particles);
+        init_spread_measure = norm(regen_spread);
+        best_pose = mean(particles,1);
+    elseif(localized == false)
+        [particles, weights] = pf.particle_filter(particles,...
+            dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
+            regen_rate, regen_spread, sampleTime, map);
+        best_pose = weights'*particles;
+        if(norm(regen_spread)>=init_spread_measure/10)
+            regen_spread = momentum*regen_spread;
+        end
+        if(norm(var(particles,weights))<0.1)
+            localized=true;
+        end
+    end
+    
+    if(localized == true)
+        best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
+    end
     % Fin del TO DO
 	
 	% TO DO: A*
-		% Solamente si todav�a no se hizo
-		% path_to_a = plan.path_planning(map, best_pose, A);
+    % Solamente si todavia no se hizo
+    % path_to_a = plan.path_planning(map, best_pose, A);
         
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
@@ -239,8 +203,9 @@ for idx = 2:numel(tVec)
 		delete(s2);
 	end
 	figure(1); hold on;
-	s1 = scatter(particles(:,1),particles(:,2));
-	s2 = scatter(best_pose(1), best_pose(2), 'x');
+	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
+	s2 = scatter(best_pose(1), best_pose(2), 'xk');
+    s2.SizeData = 36; s2.LineWidth = 2;
 	hold off;
     waitfor(r);
 end

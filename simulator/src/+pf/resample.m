@@ -1,4 +1,4 @@
-function new_particles = resample(particles, weights, regen_rate, regen_spread)
+function new_particles = resample(particles, weights, regen_rate, regen_spread, map)
     % Returns a new set of particles obtained by performing
     % stochastic universal sampling.
     %
@@ -25,15 +25,34 @@ function new_particles = resample(particles, weights, regen_rate, regen_spread)
         end
         new_particles(j,:) = particles(i,:); % new particle is chosen according to where u landed in the "roulette"
         u = u + 1/M; % incrementing u in 1/M
-	end
-	
+    end
 	
 	[~, surv_idx] = unique(new_particles, 'row');
+    
+    dead_particles = M-size(surv_idx,1);
+    norm_particles = ceil(dead_particles/5);
+    unif_particles = dead_particles - norm_particles;
+    mean_particles = weights'*particles;
+    xlims = map.XLocalLimits;
+    ylims = map.YLocalLimits;
 
-	if(size(surv_idx,1) < regen_rate)
+	if(dead_particles > regen_rate)
 		idx = 1:M;
 		regen_index = ~(ismember(idx, surv_idx));
-		new_particles(regen_index,:) = mvnrnd(weights'*particles, diag(regen_spread), M-length(surv_idx));
+		new_particles(regen_index,1:2) = [
+        unifrnd(xlims(1), xlims(2), unif_particles, 1), ...
+        unifrnd(ylims(1), ylims(2), unif_particles, 1);
+        mvnrnd(mean_particles(1:2),...
+            diag(regen_spread(1:2)), norm_particles)];
+        
+        oor_idx = find(getOccupancy(map,new_particles(:,1:2))>=map.FreeThreshold);
+        for i=oor_idx'
+            while(getOccupancy(map,new_particles(i,1:2))>=map.FreeThreshold)
+                new_particles(i,1:2) = [
+                unifrnd(xlims(1), xlims(2), 1, 1), ...
+                unifrnd(ylims(1), ylims(2), 1, 1)];
+            end
+        end
 	end
 	
 end
