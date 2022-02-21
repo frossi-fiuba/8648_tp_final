@@ -1,5 +1,5 @@
 function [new_particles,weights] = particle_filter(particles, dd, v_cmd, w_cmd,...
-	z_r, z_t, lidar_maxrange, timestep, map)
+	z_r, z_t, lidar_maxrange, regen_rate, regen_spread, timestep, map)
 %pf.particle_filter Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -12,7 +12,7 @@ function [new_particles,weights] = particle_filter(particles, dd, v_cmd, w_cmd,.
         weights = pf.measurement_model(z_r, z_t, lidar_maxrange, new_particles, map);
         normalizer = sum(weights);
         weights = weights ./ normalizer;
-        particles = pf.resample(new_particles, weights);
+        particles = pf.resample(new_particles, weights, regen_rate, regen_spread);
 	end
 	
 	% devolver particulas, calcular media y varianza afuera, pesada por los

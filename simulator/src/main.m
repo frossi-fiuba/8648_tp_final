@@ -86,7 +86,7 @@ wRef(tVec >= 20) = -0.1;
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
 
-n_particles = 600;
+n_particles = 100;
 old_best_pose = zeros(1,3);
 %% Simulacion
 
@@ -132,6 +132,9 @@ end
 % como una uniforme de 1/n siendo n la cantidad de celdas libres
 %bel = bel / n_freecells; 
 
+regen_rate = 20; % cantidad de particulas unicas para regenerar
+regen_spread = [0.05,0.05,0.2];
+var_momentum = 0.95;
 
 
 for idx = 2:numel(tVec)   
@@ -207,19 +210,18 @@ for idx = 2:numel(tVec)
         % hacer algo con la medicion del lidar (ranges) y con el estado
         % actual de la odometria ( pose(:,idx) ) MEJORAR la pose,
         % iterando la misma con este cloud points obtenido por el LIDAR.
-	
+		
 		if (idx == 2)
 			particles = pf.initialize_particles(n_particles,map);
+			best_pose = mean(particles,1);
 		else
 			[particles, weights] = pf.particle_filter(particles,...
 				dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
-				sampleTime, map);
+				regen_rate, regen_spread, sampleTime, map);
 			best_pose = weights'*particles;
 			disp(best_pose);
-			if(size(unique(particles, 'row'),1) < 20) 
-				disp("entre al gaussiano")
-				n_particles = 200;
-				particles = best_pose + mvnrnd([0,0,0],diag([0.05,0.05,0.2]), n_particles);
+			if(min(regen_spread) > 0.01)
+				regen_spread = var_momentum*regen_spread;
 			end
 		end
 	% agregar una variable que indique que se localiz� el robot, a partir
@@ -234,8 +236,12 @@ for idx = 2:numel(tVec)
     viz(pose(:,idx),ranges)
 	if(idx >= 3)
 		delete(s1);
+		delete(s2);
 	end
-	figure(1); hold on; s1 = scatter(particles(:,1),particles(:,2));
+	figure(1); hold on;
+	s1 = scatter(particles(:,1),particles(:,2));
+	s2 = scatter(best_pose(1), best_pose(2), 'x');
+	hold off;
     waitfor(r);
 end
 
