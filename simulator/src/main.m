@@ -30,6 +30,7 @@ end
     
 
 % Definicion del robot (disco de diametro = 0.35m)
+robot_R = 0.35/2;
 R = 0.072/2;  % Radio de las ruedas [m]
 L = 0.235;  % Distancia entre ruedas [m]
 dd = base.DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
@@ -62,7 +63,7 @@ lidar.maxRange = 10; % original: 8;
 % Crear visualizacion
 viz = base.Visualizer2D;
 viz.mapName = 'map';
-viz.robotRadius = 0.35/2;
+viz.robotRadius = robot_R;
 attachLidarSensor(viz,lidar);
 %%
 % Parametros de la Simulacion
