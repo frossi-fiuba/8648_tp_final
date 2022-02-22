@@ -6,7 +6,6 @@ clear all
 % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
 verMatlab= ver('MATLAB');
 
-
 % simula datos no validos del lidar real, probar si se la banca
 simular_ruido_lidar = false;
 % false para desarrollar usando el simulador, true para conectarse al robot real
@@ -72,7 +71,7 @@ sampleTime = 0.1;                   % Sample time [s]
 initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
 %initPose = [4.5; 3.5; -pi/2]; 
 % (el robot pude arrancar en cualquier lugar valido del mapa)
-
+path = plan.path_planning(map, initPose, [3,1]);
 % Inicializar vectores de tiempo, entrada y pose
 tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion total
 
@@ -100,11 +99,25 @@ regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
 momentum = 0.9;
 localized = false;
 
+path_idx = 1;
+distance_tolerance = 0.2;
+
 for idx = 2:numel(tVec)   
 
     % velocidades iniciales
-    v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
-    w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+    % v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
+    % w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+    
+    % opcion 1; paso a paso cambia
+    % [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(idx, :))
+
+    % hasta alcanzar la distance tolerance no cambiar
+    [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(path_idx, :))
+    if (plan.euclidean_distance(pose(1:2, idx-1), path(path_idx, 1:2)) < distance_tolerance)
+        display("idx")
+        path_idx = path_idx + 1
+    end
+
 	% empezar con velocidades relacionadas a que mida el lidar asi no se
 	% choca pero puede explorar
     
