@@ -62,6 +62,7 @@ lidar.maxRange = 10; % original: 8;
 % Crear visualizacion
 viz = base.Visualizer2D;
 viz.mapName = 'map';
+viz.robotRadius = 0.35/2;
 attachLidarSensor(viz,lidar);
 %%
 % Parametros de la Simulacion
@@ -71,8 +72,13 @@ sampleTime = 0.1;                   % Sample time [s]
 initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
 %initPose = [4.5; 3.5; -pi/2]; 
 % (el robot pude arrancar en cualquier lugar valido del mapa)
-goal = [1,3];
-path = plan.path_planning(map, initPose, goal);
+goal = [1,1];
+% CONV MAP
+conv_map = plan.convolve_map(map, 0.18, 1.5);
+path = plan.path_planning(conv_map, initPose, goal);
+% path = [smooth(path(:,1)), smooth(path(:,2))]; 
+% ORIGINAL MAP
+%path = plan.path_planning(map, initPose, goal);
 %path = [[2,2.7], [2,3]]
 % Inicializar vectores de tiempo, entrada y pose
 tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion total
@@ -99,8 +105,11 @@ distance_tolerance = 0.2;
 angle_tolerance = pi/8;
 rotate = true;
 
+
+K_v = 2;
+K_w = 1;
 max_v = 0.29;
-max_w = 0.5;
+max_w = 1;
 v_cmd = 0;
 w_cmd = 0;
 

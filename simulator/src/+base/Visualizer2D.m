@@ -103,7 +103,7 @@ classdef Visualizer2D < matlab.System & matlab.system.mixin.CustomIcon
             % Initialize lidar lines
             if obj.hasLidar
                 for idx = 1:numel(obj.scanAngles)
-                    obj.LidarHandles(idx) = plot(obj.ax,0,0,'b--');
+                    obj.LidarHandles(idx) = plot(obj.ax,0,0,'g:');
                 end
             end
             
