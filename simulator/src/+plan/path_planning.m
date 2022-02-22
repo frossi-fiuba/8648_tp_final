@@ -1,11 +1,13 @@
 function path = path_planning(map, start, goal)
 	% start y goal tienen que ser del mundo.
 	
-	% mapa:
-	viz = base.Visualizer2D;
-	viz.mapName = 'map';
-	viz(start);
-	viz([goal,0]');
+% 	mapa:
+% 	viz = base.Visualizer2D;
+% 	viz.mapName = 'map';
+% 	viz(start);
+% 	viz([goal,0]');
+
+	disp 'starting path planning'
 	
 	% cambio de World a Grid
 	start_point = start(1:2)';
@@ -67,7 +69,7 @@ function path = path_planning(map, start, goal)
 		
 		% pongo los parents en la lista cerrada
 		closed_list(parent_y,parent_x) = 1;
-		viz([grid2world(map, [parent_x, parent_y]), 0]);
+% 		viz([grid2world(map, [parent_x, parent_y]), 0]);
 		
 		% neighbors de los parents
 		n = plan.neighbors([parent_y, parent_x], map_size);
@@ -101,8 +103,8 @@ function path = path_planning(map, start, goal)
 	j=0;
 	path = zeros(prod(map_size), 2);
 	while previous_x(parent(1), parent(2))>=0
-		viz([grid2world(map,[parent(2), parent(1)]),0]);
-		viz([grid2world(map,goal),0]);
+% 		viz([grid2world(map,[parent(2), parent(1)]),0]);
+% 		viz([grid2world(map,goal),0]);
 
 	% 	%for visualization: Plot goal again
 	% 	if(parent(1) == goal_y && parent(2) == goal_x)

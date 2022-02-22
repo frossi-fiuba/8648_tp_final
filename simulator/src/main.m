@@ -4,7 +4,7 @@ close all
 clear all
 
 % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
-verMatlab= ver('MATLAB');
+verMatlab = ver('MATLAB');
 
 % simula datos no validos del lidar real, probar si se la banca
 simular_ruido_lidar = false;
@@ -35,7 +35,7 @@ L = 0.235;  % Distancia entre ruedas [m]
 dd = base.DifferentialDrive(R,L); % creacion del Simulador de robot diferencial
 
 % Creacion del entorno
-load ../maps/2021_2c_tp_map.mat     %carga el mapa como occupancyMap en la variable 'map'
+load ../maps/2021_2c_tp_map.mat %carga el mapa como occupancyMap en la variable 'map'
 
 if verMatlab.Release=='(R2016b)'
     %Para versiones anteriores de MATLAB, puede ser necesario ajustar mapa
@@ -69,13 +69,13 @@ attachLidarSensor(viz,lidar);
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
-%initPose = [4.5; 3.5; -pi/2]; 
+initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
+
 % (el robot pude arrancar en cualquier lugar valido del mapa)
 goal = [1,1];
 % CONV MAP
-conv_map = plan.convolve_map(map, 0.18, 1.5);
-path = plan.path_planning(conv_map, initPose, goal);
+conv_map = plan.convolve_map(map, 0.15, 1.5);
+
 % path = [smooth(path(:,1)), smooth(path(:,2))]; 
 % ORIGINAL MAP
 %path = plan.path_planning(map, initPose, goal);
@@ -99,6 +99,9 @@ end
 regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
 momentum = 0.9;
 localized = false;
+is_obs = false;
+is_rot = false;
+path_planned = false;
 
 path_idx = 1;
 distance_tolerance = 0.2;
@@ -116,79 +119,59 @@ w_cmd = 0;
 for idx = 2:numel(tVec)   
 
 
-    % 1 roto hasta el angulo.
-    start = pose(:, idx-1);
-    goal = path(path_idx, :);
+	if(localized == true)
+		% 1 roto hasta el angulo.
+		start = pose(:, idx-1);
+		goal = path(path_idx, :);
 
-    x_0 = start(1);
-    y_0 = start(2);
-    theta_0 = start(3);
+		x_0 = start(1);
+		y_0 = start(2);
+		theta_0 = start(3);
 
-    x_1 = goal(1);
-    y_1 = goal(2);
+		x_1 = goal(1);
+		y_1 = goal(2);
 
-    goal_angle = atan2(y_1-y_0, x_1-x_0);
-    diff_angle = angdiff(goal_angle, theta_0);
-    %diff_angle = abs(mod(diff_angle + pi/2, pi) -pi/2);
-    display("diff angle");
-    display(diff_angle*180/pi);
-    if (rotate)
-        if (abs(diff_angle) > angle_tolerance)
-            % rota
-            v_cmd = 0;
+		goal_angle = atan2(y_1-y_0, x_1-x_0);
+		diff_angle = angdiff(goal_angle, theta_0);
 
-            % revisar;
-            ang_speed = 2*abs(diff_angle);
-        
-            clockwise = (diff_angle > 0);
-            
-            if clockwise
-                w_cmd = -abs(ang_speed);
-            else
-                w_cmd = abs(ang_speed);
-            end
+		if (rotate)
+			if (abs(diff_angle) > angle_tolerance)
+				% rota
+				v_cmd = 0;
 
-            if (abs(w_cmd) > max_w)
-                w_cmd = max_w * w_cmd / abs(w_cmd);
-            end
-        else
-            rotate = false;
-        end
-    else
-        % moverse derecho
-        distance = move.euclidean_distance(start, goal);
-        if ( distance > distance_tolerance)
-            w_cmd = 0;
+				% revisar;
+				ang_speed = 2*abs(diff_angle);
 
-            v_cmd = 2*distance;
-            if (abs(v_cmd) > max_v)
-                v_cmd = max_v * v_cmd / abs(v_cmd);
-            end
-        else
-            path_idx = path_idx + 1;
-            rotate = true;
-        end
-    end
+				clockwise = (diff_angle > 0);
 
+				if clockwise
+					w_cmd = -abs(ang_speed);
+				else
+					w_cmd = abs(ang_speed);
+				end
 
+				if (abs(w_cmd) > max_w)
+					w_cmd = max_w * w_cmd / abs(w_cmd);
+				end
+			else
+				rotate = false;
+			end
+		else
+			% moverse derecho
+			distance = move.euclidean_distance(start, goal);
+			if ( distance > distance_tolerance)
+				w_cmd = 0;
 
-    % hasta alcanzar la distance tolerance no cambiar
-    % [v_cmd, w_cmd] = move.move_to_point(pose(:,idx-1), path(path_idx, :))
-    % if (plan.euclidean_distance(pose(1:2, idx-1), path(path_idx, 1:2)) < distance_tolerance)
-    %     display("idx")
-    %     path_idx = path_idx + 1
-    % end
-
-	% empezar con velocidades relacionadas a que mida el lidar asi no se
-	% choca pero puede explorar
-    
-    % TO DO
-    % generar velocidades para este timestep
-    % A*, veo que cell sigue y pongo v y w para moverme a esa celda (al centro...)
-    % aca vamos a usar una pose "mejorada" en la iteracion anterior, 
-    % por las mediciones que obtuvimos del LIDAR
-    % jugar con acceleraciones y momento
-    % fin del TO DO
+				v_cmd = 2*distance;
+				if (abs(v_cmd) > max_v)
+					v_cmd = max_v * v_cmd / abs(v_cmd);
+				end
+			else
+				path_idx = path_idx + 1;
+				rotate = true;
+			end
+		end
+	end
     
     % a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
     
@@ -238,6 +221,52 @@ for idx = 2:numel(tVec)
     %
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
+	
+	% chequeo que no tenga obstaculos
+	z_t = lidar.scanAngles;
+	[min_ranges, min_idx] = min(ranges);
+	min_angle = pi/(length(z_t)-1);
+	
+	front_cone = (floor(length(z_t)/4)+1):(floor(3*length(z_t)/4));
+	
+	if(min(ranges(front_cone)) <= 0.25)
+		is_obs = true;
+		% localized = false; % para cuando agreguemos A*
+		v_cmd = 0;
+	else
+		is_obs = false;
+	end
+	
+	% IRFE (Initial Random Free Exploration)
+	% si no esta localizado, ejecutar IRFE.
+	if(localized == false)
+		% si esta obstaculizado, que elija un sentido (horario
+		% o antihorario) y rote hasta que se libere.
+		if(is_obs == true)
+			% si no esta rotando genera un w
+			if(is_rot == false)
+				% el w se genera segun los obstaculos que detecte...
+				% si detecto que hay obstaculos en ambas direcciones,
+				% giro aleatorio
+				if(abs(z_t(min_idx)) <= min_angle)
+					w_cmd = 0.75*(2*binornd(1,0.5)-1);
+				% si detecto que hay obstaculos en angulos negativos,
+				% entonces roto en sentido positivo
+				elseif(z_t(min_idx) < -min_angle)
+					w_cmd = 0.75;					
+				elseif(z_t(min_idx) > min_angle)
+					w_cmd = -0.75;					
+				end
+				is_rot = true;
+				% si estaba rotando que siga rotando
+			end
+		% si no esta obstaculizado, que se mueva en direccion lineal
+		else
+			w_cmd = 0;
+			is_rot = false;
+			v_cmd = 0.25;
+		end
+	end
     
     % si esta deslocalizado se ejecuta un filtro de particulas, si esta
     % localizado se actualiza esa pose estimada con el modelo de odometría,
@@ -256,31 +285,43 @@ for idx = 2:numel(tVec)
         if(norm(regen_spread)>=init_spread_measure/10)
             regen_spread = momentum*regen_spread;
         end
-        if(norm(var(particles,weights))<0.1)
-            localized=true;
+        if(norm(var(particles,weights))<0.05)
+            localized = true;
+			delete(s1)
         end
     end
     
     if(localized == true)
         best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
-    end
-    % Fin del TO DO
-	
-	% TO DO: A*
-    % Solamente si todavia no se hizo
-    % path_to_a = plan.path_planning(map, best_pose, A);
-        
+		if(path_planned == false)
+			path = plan.path_planning(conv_map, best_pose', goal);
+			path_planned = true;
+		end
+	end
+
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
 	if(idx >= 3)
-		delete(s1);
+		if(localized == false)
+			delete(s1);
+		end
+		
 		delete(s2);
+		
 	end
+
+	if(localized == false)
+		figure(1); hold on;
+		s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
+		hold off;
+	end
+	
 	figure(1); hold on;
-	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
 	s2 = scatter(best_pose(1), best_pose(2), 'xk');
     s2.SizeData = 36; s2.LineWidth = 2;
 	hold off;
+	
     waitfor(r);
+	
 end
 
