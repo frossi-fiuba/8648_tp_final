@@ -30,8 +30,8 @@ function new_particles = resample(particles, weights, regen_rate, regen_spread, 
 	[~, surv_idx] = unique(new_particles, 'row');
     
     dead_particles = M-size(surv_idx,1);
-    norm_particles = ceil(dead_particles/5);
-    unif_particles = dead_particles - norm_particles;
+    unif_particles = ceil(dead_particles/4);
+    norm_particles = dead_particles - unif_particles;
     mean_particles = weights'*particles;
     xlims = map.XLocalLimits;
     ylims = map.YLocalLimits;

@@ -22,7 +22,9 @@ function [new_particles, weights] = particle_filter(particles, dd, v_cmd, w_cmd,
     new_particles = pf.sample_motion_model(dd, v_cmd, w_cmd, particles, timestep);
     % compute the weights of the particles using the lidar measurement mdl
     weights = pf.measurement_model(z_r, z_t, lidar_maxrange, new_particles, map);
-    % normalize the weights
+    % detect NaN weights, if so they are discarded (weight set to zero)
+	weights(isnan(weights)) = 0;
+	% normalize the weights
     normalizer = sum(weights);
     weights = weights ./ normalizer;
     % resample particles

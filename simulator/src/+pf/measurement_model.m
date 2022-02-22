@@ -34,7 +34,8 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		% add pi and compensate for lidar coordinates wrt robot coordinates
 		
         % get all indexes with non-NaN entries
-		NaN_idx = find(~isnan(intersects(:,1,i)));
+		NaN_idx_aux = find(~isnan(intersects(:,1,i)));
+		NaN_idx = find(~isnan(z_r(NaN_idx_aux)));
 
         % define a clean vector of intersections without NaNs
 		clean_intersects = intersects(NaN_idx,:,i);
@@ -48,6 +49,6 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		
 		% compute weight of particle using gaussian distribution
 		weight(i) = weight(i).*mean(normpdf(clean_dist-z_r(NaN_idx),0,sigma), 1)';
-        % TO DO: test other, more realistic distributions, like mixtures?
 	end
+	
 end
