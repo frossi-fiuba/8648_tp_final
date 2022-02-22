@@ -21,11 +21,11 @@ function [v_cmd, w_cmd] = move_to_point(start, goal)
     w_cmd = K_ang*(steering_angle - theta_0);
 
     if (abs(v_cmd) > max_v)
-        v_cmd = max_v;
+        v_cmd = max_v * v_cmd / abs(v_cmd);
     end
 
     if (abs(w_cmd) > max_w)
-        w_cmd = max_w;
+        w_cmd = max_w * w_cmd / abs(w_cmd);
     end
 
 end
