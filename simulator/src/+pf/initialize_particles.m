@@ -1,8 +1,8 @@
 function particles = initialize_particles(count,map)
     % Returns a set of randomly initialized particles.
 
-	x_map_size = map.GridSize(1)
-	y_map_size = map.GridSize(2)
+	x_map_size = map.GridSize(1);
+	y_map_size = map.GridSize(2);
 
     pseudo_particles = [
         unidrnd(x_map_size, count, 1), ...

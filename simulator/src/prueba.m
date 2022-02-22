@@ -2,16 +2,16 @@ initPose = [0.91,1.27,-1.38]';
 path = plan.path_planning(map, initPose, [3,1]);
 max_w = 0.5;
 max_v = 0.29;
-[w_vec, v_vec] = plan.generate_odometry(path, initPose(3), 0.1, 0.5, 0.29);
+% [w_vec, v_vec] = plan.generate_odometry(path, initPose(3), 0.1, 0.5, 0.29);
 
-vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
-wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
-wRef(tVec < 5) = -0.2;
-wRef(tVec >=7.5) = 0.2;
-wRef(tVec >= 20) = -0.1;
+% vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
+% wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
+% wRef(tVec < 5) = -0.2;
+% wRef(tVec >=7.5) = 0.2;
+% wRef(tVec >= 20) = -0.1;
 
-vxRef(1:length(v_vec)) = v_vec;
-vxRef(1:length(w_vec)) = w_vec;
+% vxRef(1:length(v_vec)) = v_vec;
+% vxRef(1:length(w_vec)) = w_vec;
 
 viz = base.Visualizer2D;
 viz.mapName = 'map';
@@ -23,8 +23,9 @@ for idx = 2:numel(tVec)
     % (mantener las velocidades bajas (v_cmd < 0.1) (w_cmd < 0.5) minimiza vibraciones y
     % mejora las mediciones.
 
-    v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
-    w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+    % v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
+    % w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+    [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(idx, :));
 	% empezar con velocidades relacionadas a que mida el lidar asi no se
 	% choca pero puede explorar
     
