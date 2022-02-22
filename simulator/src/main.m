@@ -62,6 +62,7 @@ lidar.maxRange = 10; % original: 8;
 % Crear visualizacion
 viz = base.Visualizer2D;
 viz.mapName = 'map';
+viz.robotRadius = 0.35/2;
 attachLidarSensor(viz,lidar);
 %%
 % Parametros de la Simulacion
@@ -71,16 +72,16 @@ sampleTime = 0.1;                   % Sample time [s]
 initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
 %initPose = [4.5; 3.5; -pi/2]; 
 % (el robot pude arrancar en cualquier lugar valido del mapa)
-path = plan.path_planning(map, initPose, [3,1]);
+goal = [1,1];
+% CONV MAP
+conv_map = plan.convolve_map(map, 0.18, 1.5);
+path = plan.path_planning(conv_map, initPose, goal);
+% path = [smooth(path(:,1)), smooth(path(:,2))]; 
+% ORIGINAL MAP
+%path = plan.path_planning(map, initPose, goal);
+%path = [[2,2.7], [2,3]]
 % Inicializar vectores de tiempo, entrada y pose
 tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion total
-
-% generar comandos a modo de ejemplo
-vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
-wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
-wRef(tVec < 5) = -0.2;
-wRef(tVec >=7.5) = 0.2;
-wRef(tVec >= 20) = -0.1;
 
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
@@ -101,22 +102,82 @@ localized = false;
 
 path_idx = 1;
 distance_tolerance = 0.2;
+angle_tolerance = pi/8;
+rotate = true;
+
+
+K_v = 2;
+K_w = 1;
+max_v = 0.29;
+max_w = 1;
+v_cmd = 0;
+w_cmd = 0;
 
 for idx = 2:numel(tVec)   
 
-    % velocidades iniciales
-    % v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
-    % w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
-    
-    % opcion 1; paso a paso cambia
-    % [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(idx, :))
+
+    % 1 roto hasta el angulo.
+    start = pose(:, idx-1);
+    goal = path(path_idx, :);
+
+    x_0 = start(1);
+    y_0 = start(2);
+    theta_0 = start(3);
+
+    x_1 = goal(1);
+    y_1 = goal(2);
+
+    goal_angle = atan2(y_1-y_0, x_1-x_0);
+    diff_angle = angdiff(goal_angle, theta_0);
+    %diff_angle = abs(mod(diff_angle + pi/2, pi) -pi/2);
+    display("diff angle");
+    display(diff_angle*180/pi);
+    if (rotate)
+        if (abs(diff_angle) > angle_tolerance)
+            % rota
+            v_cmd = 0;
+
+            % revisar;
+            ang_speed = 2*abs(diff_angle);
+        
+            clockwise = (diff_angle > 0);
+            
+            if clockwise
+                w_cmd = -abs(ang_speed);
+            else
+                w_cmd = abs(ang_speed);
+            end
+
+            if (abs(w_cmd) > max_w)
+                w_cmd = max_w * w_cmd / abs(w_cmd);
+            end
+        else
+            rotate = false;
+        end
+    else
+        % moverse derecho
+        distance = move.euclidean_distance(start, goal);
+        if ( distance > distance_tolerance)
+            w_cmd = 0;
+
+            v_cmd = 2*distance;
+            if (abs(v_cmd) > max_v)
+                v_cmd = max_v * v_cmd / abs(v_cmd);
+            end
+        else
+            path_idx = path_idx + 1;
+            rotate = true;
+        end
+    end
+
+
 
     % hasta alcanzar la distance tolerance no cambiar
-    [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(path_idx, :))
-    if (plan.euclidean_distance(pose(1:2, idx-1), path(path_idx, 1:2)) < distance_tolerance)
-        display("idx")
-        path_idx = path_idx + 1
-    end
+    % [v_cmd, w_cmd] = move.move_to_point(pose(:,idx-1), path(path_idx, :))
+    % if (plan.euclidean_distance(pose(1:2, idx-1), path(path_idx, 1:2)) < distance_tolerance)
+    %     display("idx")
+    %     path_idx = path_idx + 1
+    % end
 
 	% empezar con velocidades relacionadas a que mida el lidar asi no se
 	% choca pero puede explorar
