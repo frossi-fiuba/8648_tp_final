@@ -1,7 +1,15 @@
-initPose = [0.91,1.27,-1.38]';
-path = plan.path_planning(map, initPose, [3,1]);
+% mapa convolucionado
+conv_map = occupancyMap(map);
+inflate(conv_map, 0.18)
+conv_map_mat = imgaussfilt(conv_map.occupancyMatrix, 1.5);
+setOccupancy(conv_map, conv_map_mat);
+
+initPose = [2,2.5,0]';
+path = plan.path_planning(conv_map, initPose, [3,1]);
+path = [smooth(path(:,1)), smooth(path(:,2))];
 max_w = 0.5;
 max_v = 0.29;
+%%
 [w_vec, v_vec] = plan.generate_odometry(path, initPose(3), 0.1, 0.5, 0.29);
 
 vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
@@ -10,12 +18,25 @@ wRef(tVec < 5) = -0.2;
 wRef(tVec >=7.5) = 0.2;
 wRef(tVec >= 20) = -0.1;
 
-vxRef(1:length(v_vec)) = v_vec;
-vxRef(1:length(w_vec)) = w_vec;
+% vxRef(1:length(v_vec)) = v_vec;
+% vxRef(1:length(w_vec)) = w_vec;
+% Crear sensor lidar en simulador
+% valores en mks
+lidar = base.LidarSensor;
+lidar.sensorOffset = [.09,0];   % Posicion del sensor en el robot (asumiendo mundo 2D)
+scaleFactor = 2; % original: 10; %decimar lecturas de lidar acelera el algoritmo
+num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
+lidar.scanAngles = linspace(-pi,pi,num_scans);
+lidar.maxRange = 10; % original: 8;
 
+% Crear visualizacion
 viz = base.Visualizer2D;
 viz.mapName = 'map';
+attachLidarSensor(viz,lidar);
 
+pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
+pose(:,1) = initPose;
+real_idx = 2;
 for idx = 2:numel(tVec)   
 
     % Generar aqui criteriosamente velocidades lineales v_cmd y angulares w_cmd
@@ -23,8 +44,15 @@ for idx = 2:numel(tVec)
     % (mantener las velocidades bajas (v_cmd < 0.1) (w_cmd < 0.5) minimiza vibraciones y
     % mejora las mediciones.
 
-    v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
-    w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+    % v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
+    % w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
+%     [v_cmd, w_cmd] = plan.move_to_point(pose(:,idx-1), path(real_idx, :));
+%     
+%     if plan.euclidean_distance(pose(:,idx-1), path(real_idx,:)) < 0.05
+%         real_idx = real_idx+1;
+%     end
+    v_cmd = v_vec(idx-1);
+    w_cmd = w_vec(idx-1);
 	% empezar con velocidades relacionadas a que mida el lidar asi no se
 	% choca pero puede explorar
     
@@ -112,7 +140,7 @@ for idx = 2:numel(tVec)
 		% path_to_a = plan.path_planning(map, best_pose, A);
         
     % actualizar visualizacion
-    viz(pose(:,idx))
+    viz(pose(:,idx),ranges)
 % 	if(idx >= 3)
 % 		delete(s1);
 % 		delete(s2);

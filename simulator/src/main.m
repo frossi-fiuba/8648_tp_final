@@ -64,6 +64,7 @@ lidar.maxRange = 10; % original: 8;
 viz = base.Visualizer2D;
 viz.mapName = 'map';
 attachLidarSensor(viz,lidar);
+
 %%
 % Parametros de la Simulacion
 
@@ -77,11 +78,11 @@ initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
 tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion total
 
 % generar comandos a modo de ejemplo
-vxRef = 0.05*ones(size(tVec));   % Velocidad lineal a ser comandada
+vxRef = 0.05*zeros(size(tVec));   % Velocidad lineal a ser comandada
 wRef = zeros(size(tVec));       % Velocidad angular a ser comandada
-wRef(tVec < 5) = -0.2;
-wRef(tVec >=7.5) = 0.2;
-wRef(tVec >= 20) = -0.1;
+% wRef(tVec < 5) = -0.2;
+% wRef(tVec >=7.5) = 0.2;
+% wRef(tVec >= 20) = -0.1;
 
 pose = zeros(3,numel(tVec));    % Inicializar matriz de pose
 pose(:,1) = initPose;
@@ -99,14 +100,23 @@ end
 regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
 momentum = 0.9;
 localized = false;
+is_obs = false;
+theta = 0;
+iterations = 0;
 
 for idx = 2:numel(tVec)   
 
-    % velocidades iniciales
-    v_cmd = vxRef(idx-1);   % estas velocidades estan como ejemplo ...
-    w_cmd = wRef(idx-1);    %      ... para que el robot haga algo.
-	% empezar con velocidades relacionadas a que mida el lidar asi no se
-	% choca pero puede explorar
+    % velocidades iniciales, las primeras tienen que ser nulas,
+	% de esa forma evitamos que se choque con algo:
+	
+	if(idx == 2 && ((vxRef(idx-1) ~= 0) || (wRef(idx-1) ~= 0)))
+		vxRef(idx-1) = 0;
+		wRef(idx-1) = 0;
+	end
+	
+	% adquiere velocidades para esta iteracion
+    v_cmd = vxRef(idx-1);
+    w_cmd = wRef(idx-1);
     
     % TO DO
     % generar velocidades para este timestep
@@ -151,7 +161,7 @@ for idx = 2:numel(tVec)
 		% Conversion de la terna del robot a la global
         vel = base.bodyToWorld(velB,pose(:,idx-1));
         % Realizar un paso de integracion
-        pose(:,idx) = pose(:,idx-1) + vel*sampleTime; 
+        pose(:,idx) = pose(:,idx-1) + vel*sampleTime;
         % Tomar nueva medicion del lidar
         ranges = lidar(pose(:,idx));
         if simular_ruido_lidar
@@ -161,15 +171,52 @@ for idx = 2:numel(tVec)
             ranges(not_valid<=chance_de_medicion_no_valida)=NaN;
         end
     end
-    %
+
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
+	
+	% R
+	% ventaneo ranges, para obtener un rango de angulos (cono) que tenga
+	% alta distancia promedio, lo que indica que hay espacio libre en esa
+	% direccion.
+	
+	% TIRAR UNA MONEDA PARA QUE EMPIECE A ROTAR EN SENTIDO POSITIVO O
+	% NEGATIVO HASTA QUE ENCUENTRE ESPACIO PARA AVANZAR
+	
+	z_t = lidar.scanAngles;
+	
+	front_cone = (floor(length(z_t)/4)+2):(floor(3*length(z_t)/4)-1);
+	
+	if(min(ranges(front_cone)) <= 0.2)
+		is_obs = true;
+		vxRef(idx) = 0;
+	else
+		is_obs = false;
+	end
+	
+	if(localized == false)
+		if(is_obs == true && iterations == 0)
+			% si esta obstaculizado genero un angulo de pose nuevo y trato
+			% de llegar a ese angulo
+			theta = unifrnd(-pi/2,pi/2,1,1);
+			% establezco una velocidad angular para 
+			% llegar en una cantidad de time steps
+			wRef(idx) = theta/sampleTime;
+			iterations = ceil(abs(wRef(idx))/0.75);
+			wRef(idx:idx+iterations-1)=wRef(idx)/iterations;
+			% dejo quieto al robot para que termine de rotar
+			vxRef(idx) = 0;
+		elseif(is_obs == false)
+			% si no esta obstaculizado que siga derecho
+			vxRef(idx)=0.25;
+		end
+	end
     
     % si esta deslocalizado se ejecuta un filtro de particulas, si esta
     % localizado se actualiza esa pose estimada con el modelo de odometría,
     % deberiamos usar EKF o algo menos exigente para seguir corrigiendo la
     % estimacion.
-    if (idx == 2)
+	if (idx == 2)
         particles = pf.initialize_particles(n_particles,map);
         regen_spread = var(particles);
         init_spread_measure = norm(regen_spread);
@@ -182,20 +229,21 @@ for idx = 2:numel(tVec)
         if(norm(regen_spread)>=init_spread_measure/10)
             regen_spread = momentum*regen_spread;
         end
-        if(norm(var(particles,weights))<0.1)
-            localized=true;
+        if(norm(var(particles,weights))<0.05)
+            localized = true;
         end
-    end
+	end
     
-    if(localized == true)
+	if(localized == true)
         best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
-    end
+	end
+	
     % Fin del TO DO
 	
 	% TO DO: A*
     % Solamente si todavia no se hizo
     % path_to_a = plan.path_planning(map, best_pose, A);
-        
+
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
 	if(idx >= 3)
@@ -208,5 +256,9 @@ for idx = 2:numel(tVec)
     s2.SizeData = 36; s2.LineWidth = 2;
 	hold off;
     waitfor(r);
+	
+	if(iterations > 0)
+		iterations = iterations-1;
+	end
 end
 

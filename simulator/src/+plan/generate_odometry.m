@@ -1,15 +1,15 @@
 function [w_vec, v_vec] = generate_odometry(path, theta0, time_step, max_w, max_v)
 
 	% max vectors size
-	w_vec = zeros(ceil(180/135*pi/time_step) + ceil(pi/4/time_step)*size(path,1),1);
+	w_vec = zeros(500+ceil(180/135*pi/time_step) + ceil(pi/4/time_step)*size(path,1),1);
 	v_vec = zeros(size(w_vec));
 	
 	dif_path = (path(2:end,:) - path(1:end-1,:));
 	
 	theta_vec = atan(dif_path(:,2)./dif_path(:,1)); %opcion: smooth(theta_vec)
-	theta_i = [theta0; theta_vec];
+	theta_i = [wrapToPi(theta0); theta_vec];
 	% vector de w inicial
-	w = (theta_vec - theta_i(1:end-1))/time_step;
+	w =(theta_vec - theta_i(1:end-1))/time_step;
 	
 	% vector inicial de v, una vez que el robot fue rotado
 	d = vecnorm(dif_path, 2, 2);
