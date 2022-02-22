@@ -70,7 +70,7 @@ attachLidarSensor(viz,lidar);
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [2; 2.5; -pi/2];       % Pose inicial (x y theta) del robot simulado
+initPose = [1; 1; pi/6];       % Pose inicial (x y theta) del robot simulado
 %initPose = [4.5; 3.5; -pi/2]; 
 % (el robot pude arrancar en cualquier lugar valido del mapa)
 
@@ -101,8 +101,9 @@ regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
 momentum = 0.9;
 localized = false;
 is_obs = false;
-theta = 0;
-iterations = 0;
+is_rot = false;
+% theta = 0;
+% iterations = 0;
 
 for idx = 2:numel(tVec)   
 
@@ -175,40 +176,51 @@ for idx = 2:numel(tVec)
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
 	
-	% R
-	% ventaneo ranges, para obtener un rango de angulos (cono) que tenga
-	% alta distancia promedio, lo que indica que hay espacio libre en esa
-	% direccion.
-	
-	% TIRAR UNA MONEDA PARA QUE EMPIECE A ROTAR EN SENTIDO POSITIVO O
-	% NEGATIVO HASTA QUE ENCUENTRE ESPACIO PARA AVANZAR
-	
+	% chequeo que no tenga obstaculos
 	z_t = lidar.scanAngles;
+	[min_ranges, min_idx] = min(ranges);
+	min_angle = pi/(length(z_t)-1);
 	
-	front_cone = (floor(length(z_t)/4)+2):(floor(3*length(z_t)/4)-1);
+	front_cone = (floor(length(z_t)/4)+1):(floor(3*length(z_t)/4));
 	
 	if(min(ranges(front_cone)) <= 0.2)
 		is_obs = true;
+% 		localized = false; % para cuando agreguemos A*
 		vxRef(idx) = 0;
 	else
 		is_obs = false;
 	end
 	
+	% IRFE (Initial Random Free Exploration)
+	% si no esta localizado, ejecutar IRFE.
 	if(localized == false)
-		if(is_obs == true && iterations == 0)
-			% si esta obstaculizado genero un angulo de pose nuevo y trato
-			% de llegar a ese angulo
-			theta = unifrnd(-pi/2,pi/2,1,1);
-			% establezco una velocidad angular para 
-			% llegar en una cantidad de time steps
-			wRef(idx) = theta/sampleTime;
-			iterations = ceil(abs(wRef(idx))/0.75);
-			wRef(idx:idx+iterations-1)=wRef(idx)/iterations;
-			% dejo quieto al robot para que termine de rotar
-			vxRef(idx) = 0;
-		elseif(is_obs == false)
-			% si no esta obstaculizado que siga derecho
-			vxRef(idx)=0.25;
+		% si esta obstaculizado, que elija un sentido (horario
+		% o antihorario) y rote hasta que se libere.
+		if(is_obs == true)
+			% si no esta rotando genera un w
+			if(is_rot == false)
+				% el w se genera segun los obstaculos que detecte...
+				% si detecto que hay obstaculos en ambas direcciones,
+				% giro aleatorio
+				if(abs(z_t(min_idx)) <= min_angle)
+					wRef(idx) = 0.75*(2*binornd(1,0.5)-1);
+				% si detecto que hay obstaculos en angulos negativos,
+				% entonces roto en sentido positivo
+				elseif(z_t(min_idx) < -min_angle)
+					wRef(idx) = 0.75;					
+				elseif(z_t(min_idx) > min_angle)
+					wRef(idx) = -0.75;					
+				end
+				is_rot = true;
+				% si estaba rotando que siga rotando
+			else
+				wRef(idx) = wRef(idx-1);
+			end
+		% si no esta obstaculizado, que se mueva en direccion lineal
+		else
+			wRef(idx) = 0;
+			is_rot = false;
+			vxRef(idx) = 0.25;
 		end
 	end
     
@@ -229,7 +241,7 @@ for idx = 2:numel(tVec)
         if(norm(regen_spread)>=init_spread_measure/10)
             regen_spread = momentum*regen_spread;
         end
-        if(norm(var(particles,weights))<0.05)
+        if(norm(var(particles,weights))<0.025)
             localized = true;
         end
 	end
@@ -256,9 +268,5 @@ for idx = 2:numel(tVec)
     s2.SizeData = 36; s2.LineWidth = 2;
 	hold off;
     waitfor(r);
-	
-	if(iterations > 0)
-		iterations = iterations-1;
-	end
 end
 

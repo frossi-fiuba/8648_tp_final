@@ -27,10 +27,10 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		% para compensar el cambio de coordenadas entre el lidar
 		% y el robot.
 		%lidar_offset = [0.09, 0, 0] % from the robot perspective, in meters
-		lidar_offset = [0.09*cos(x(i,3)),0.09*sin(x(i,3)),0] % in meters 
+		lidar_offset = [0.09*cos(x(i,3)),0.09*sin(x(i,3)),0]; % in meters 
 		
 		intersects(:,:,i) = rayIntersection(map, x(i,:) + lidar_offset,...
-			z_theta, lidar_maxRange);
+			z_t, lidar_maxRange);
 		% add pi and compensate for lidar coordinates wrt robot coordinates
 		
         % get all indexes with non-NaN entries
