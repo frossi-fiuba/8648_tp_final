@@ -51,6 +51,7 @@ else
     disp('ver si la compatibilidad de not R2016b, R2019a o R2020a funciona');
 end
 
+if (~use_roomba)
 % Crear sensor lidar en simulador
 % valores en mks
 lidar = base.LidarSensor;
@@ -60,11 +61,13 @@ num_scans = 144/scaleFactor; %original: 720/scaleFactor; %cambiar?
 lidar.scanAngles = linspace(-pi,pi,num_scans);
 lidar.maxRange = 10; % original: 8;
 
+
 % Crear visualizacion
 viz = base.Visualizer2D;
 viz.mapName = 'map';
 viz.robotRadius = robot_R;
 attachLidarSensor(viz,lidar);
+end
 %%
 
 % Celdas libres (el robot pude arrancar en cualquier lugar valido del mapa)
@@ -370,18 +373,18 @@ for idx = 2:numel(tVec)
 	
     tic
     % actualizar visualizacion
-    viz(pose(:,idx),ranges)
-	if(idx >= 3)
-		delete(s1);
-		delete(s2);
-        delete(step_text);
-        delete(time_text);
-	end
+        viz(pose(:,idx),ranges)
+        if(idx >= 3)
+            delete(s1);
+            delete(s2);
+            delete(step_text);
+            delete(time_text);
+        end
 
 
-	figure(1); hold on;
-	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
-	hold off;
+        figure(1); hold on;
+        s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
+        hold off;
 
 	
 	figure(1); hold on;
@@ -400,7 +403,21 @@ for idx = 2:numel(tVec)
     waitfor(r);
     time = time + sampleTime;
 
-	
+        figure(1); hold on;
+        spointA = scatter(point_a(1), point_a(2), '*k');
+        text(point_a(1)-0.2, point_a(2)-0.2, "point A");
+        spointB = scatter(point_b(1), point_b(2), '*k');
+        text(point_b(1)-0.2, point_b(2)-0.2, "point B");
+        s2 = scatter(best_pose(1), best_pose(2), 'xk');
+        s2.SizeData = 36; s2.LineWidth = 2;
+        step_text = text(3, 3, "step:" + case_name);
+        time_text = text(3, 2.5, "time:" + time);
+
+        hold off;
+
+        waitfor(r);
+        time = time + sampleTime;
+    end
 end
 
 
