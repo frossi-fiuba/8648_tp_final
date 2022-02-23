@@ -80,7 +80,7 @@ simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
 initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
 %initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
-
+initPose = [1; 3; 0];
 
 point_a = [3, 1];
 point_b = [1.1, 2.85];
@@ -142,14 +142,34 @@ w_cmd = 0;
 step_n = 1;
 case_name = "localization";
 time = 0;
+
+loc_th = 0.05; % localization variance of particles threshold
+
+%tic
+
+particles = pf.initialize_particles(n_particles,map);
+regen_spread = var(particles);
+init_spread_measure = norm(regen_spread);
+best_pose = mean(particles,1);
+
+time_move = 0;
+iter_move = 0;
+time_irfe = 0;
+iter_irfe = 0;
+time_obstacle_det = 0;
+time_pf = 0;
+iter_pf = 0;
+time_viz = 0; 
+
+
 for idx = 2:numel(tVec)   
 	% set movement. vcmd, wcmd
 	if(localized == true)
-		best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
+		%best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
 		if(path_planned == false)
 			switch step_n
 				case 1
-					case_name = "going to point A";
+					case_name = "Going to point A";
 					path = plan.path_planning(conv_map, best_pose(1:2), point_a, map);
                     path_planned = true;
 				case 2
@@ -159,7 +179,7 @@ for idx = 2:numel(tVec)
 						step_n = step_n + 1;
 					end
 				case 3
-					case_name = "going to point B";
+					case_name = "Going to point B";
 					go = true;
 					path = path_to_b; %plan.path_planning(conv_map, best_pose', point_b);%
                     path_planned = true;
@@ -178,8 +198,10 @@ for idx = 2:numel(tVec)
 		x_1 = goal(1);
 		y_1 = goal(2);
 
-
-		if(go)
+		
+		if(go && localized)
+			tic
+            iter_move = iter_move + 1;
 			if (rotate)
 				goal_angle = atan2(y_1-y_0, x_1-x_0);
 				diff_angle = angdiff(goal_angle, theta_0);
@@ -203,17 +225,25 @@ for idx = 2:numel(tVec)
 						path_idx = 1;
 						path_planned = false;
 						step_n = step_n + 1;
+                        if(step_n == 4)
+							break;
+                            % full_time = toc;
+                            % display("TIME TAKEN WAS");
+                            % display(full_time);
+                        end
 					end
 					rotate = true;
 				end
 			end
+			time_move = time_move + toc;
 		else % no go
 			v_cmd = 0;
 			w_cmd = 0;
 		end
+		
 	end
     % a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
-    
+	
     if use_roomba       % para usar con el robot real
         
         % Enviar comando de velocidad
@@ -261,7 +291,7 @@ for idx = 2:numel(tVec)
 
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
-	
+	tic
 	% chequeo que no tenga obstaculos
 	z_t = lidar.scanAngles;
 	[min_ranges, min_idx] = min(ranges);
@@ -276,15 +306,19 @@ for idx = 2:numel(tVec)
 	else
 		is_obs = false;
 	end
-	
+	time_obstacle_det = time_obstacle_det + toc;
 	% IRFE (Initial Random Free Exploration)
 	% si no esta localizado, ejecutar IRFE.
+	
 	if(localized == false)
+		
 		% si esta obstaculizado, que elija un sentido (horario
 		% o antihorario) y rote hasta que se libere.
 		if(is_obs == true)
 			% si no esta rotando genera un w
 			if(is_rot == false)
+				tic
+                iter_irfe = iter_irfe + 1;
 				% el w se genera segun los obstaculos que detecte...
 				% si detecto que hay obstaculos en ambas direcciones,
 				% giro aleatorio
@@ -299,6 +333,7 @@ for idx = 2:numel(tVec)
 				end
 				is_rot = true;
 				% si estaba rotando que siga rotando
+				time_irfe = time_irfe + toc;
 			end
 		% si no esta obstaculizado, que se mueva en direccion lineal
 		else
@@ -312,28 +347,28 @@ for idx = 2:numel(tVec)
     % localizado se actualiza esa pose estimada con el modelo de odometría,
     % deberiamos usar EKF o algo menos exigente para seguir corrigiendo la
     % estimacion.
+	
 	if(go) % agregar varianza de los pesos
-		if (idx == 2)
-			particles = pf.initialize_particles(n_particles,map);
-			regen_spread = var(particles);
-			init_spread_measure = norm(regen_spread);
-			best_pose = mean(particles,1);
-		else
+		tic
+        iter_pf = iter_pf + 1;
+		% update particles
+		
 		[particles, weights] = pf.particle_filter(particles,...
 			dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
 			regen_rate, regen_spread, sampleTime, map);
+
 		best_pose = weights'*particles;
-			if(norm(regen_spread)>=init_spread_measure/10)
-				regen_spread = momentum*regen_spread;
-			end
-			if(norm(var(particles,weights))<0.05)
-				localized = true;
-				delete(s1)
-				
-			end
+		% si regen spread (varianzas de cada coordenada) si se empiezan a clusterear accelera el algoritmo
+		if(norm(regen_spread)>=init_spread_measure/10)
+			regen_spread = momentum*regen_spread;
 		end
+		if (norm(var(particles,weights)) < loc_th)
+			localized = true;
+		end
+		time_pf = time_pf + toc;
 	end
-    
+	
+    tic
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
 	if(idx >= 3)
@@ -360,10 +395,22 @@ for idx = 2:numel(tVec)
     time_text = text(3, 2.5, "time:" + time);
 
 	hold off;
-    
+    time_viz = time_viz + toc;
+
     waitfor(r);
     time = time + sampleTime;
 
 	
 end
 
+
+display("time MOVE")
+time_move / iter_move
+display("time IRFE")
+time_irfe / iter_irfe
+display("time OBST_DET")
+time_obstacle_det / idx
+display("time PF")
+time_pf / iter_pf
+display("time VIZ")
+time_viz / idx
