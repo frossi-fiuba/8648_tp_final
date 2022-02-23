@@ -78,21 +78,21 @@ selected_cell = randi([1, n_free_cells]);
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;] % Pose inicial (x y theta) del robot simulado
+initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
 %initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
 
 
 point_a = [3, 1];
 point_b = [1.1, 2.85];
 
-inflate_radius = 0.15;
+inflate_radius = robot_R * 1;
 gaussian_filter_variance = 1.5;
 
 % CONV MAP
 conv_map = plan.convolve_map(map, inflate_radius, gaussian_filter_variance);
 % path = [smooth(path(:,1)), smooth(path(:,2))]; 
 
-path_to_b = plan.path_planning(conv_map, point_a', point_b);
+path_to_b = plan.path_planning(conv_map, point_a, point_b, map);
 % ORIGINAL MAP
 %path = plan.path_planning(map, initPose, goal);
 
@@ -133,30 +133,38 @@ K_w = 1; % constante del controlador proporcional de velocidad angular
 max_v = 0.29; % maxima velocidad lineal, satura a esta velocidad si quiere ir mas rapido.
 max_w = 1; % maxima velocidad angular, satura a esta velocidad si quiere ir mas rapido.
 
+time_running = 0;
+go = true;
 % inicializamos las velocidades en cero.
 v_cmd = 0; 
 w_cmd = 0;
 
 step_n = 1;
-goal_list = [point_a; point_b];
-goal_idx = 1;
-
+case_name = "localization";
+time = 0;
 for idx = 2:numel(tVec)   
-
 	% set movement. vcmd, wcmd
 	if(localized == true)
-
 		best_pose = pf.sample_motion_model(dd, v_cmd, w_cmd, best_pose, sampleTime);
 		if(path_planned == false)
 			switch step_n
-			case 1
-				path = plan.path_planning(conv_map, best_pose', point_a);
-			case 2
-				pass;
-			case 3
-				path = path_to_b;
+				case 1
+					case_name = "going to point A";
+					path = plan.path_planning(conv_map, best_pose(1:2), point_a, map);
+                    path_planned = true;
+				case 2
+					case_name = "Awaiting on point A";
+					time_running = time_running + sampleTime;
+					if (time_running >= 3)
+						step_n = step_n + 1;
+					end
+				case 3
+					case_name = "going to point B";
+					go = true;
+					path = path_to_b; %plan.path_planning(conv_map, best_pose', point_b);%
+                    path_planned = true;
 			end
-			path_planned = true;
+			
 		end
 		
 		% 1 roto hasta el angulo.
@@ -171,35 +179,39 @@ for idx = 2:numel(tVec)
 		y_1 = goal(2);
 
 
-
-		if (rotate)
-			goal_angle = atan2(y_1-y_0, x_1-x_0);
-			diff_angle = angdiff(goal_angle, theta_0);
-			if (abs(diff_angle) > angle_tolerance)
-				% ordena 
-				v_cmd = 0;
-				w_cmd = move.rotate(diff_angle, max_w, K_w);
-			else
-				rotate = false;
-			end
-		else
-			% moverse derecho
-			distance = move.euclidean_distance(start, goal);
-			if ( distance > distance_tolerance)
-				w_cmd = 0;
-				v_cmd = move.translate(distance, max_v, K_v);
-			else
-				path_idx = path_idx + 1;
-				if(path_idx > length(path))
-					path_planned = false;
-					step_n = step_n + 2;
-					goal_idx = goal_idx + 1;
+		if(go)
+			if (rotate)
+				goal_angle = atan2(y_1-y_0, x_1-x_0);
+				diff_angle = angdiff(goal_angle, theta_0);
+				if (abs(diff_angle) > angle_tolerance)
+					% ordena 
+					v_cmd = 0;
+					w_cmd = move.rotate(diff_angle, max_w, K_w);
+				else
+					rotate = false;
 				end
-				rotate = true;
+			else
+				% moverse derecho
+				distance = move.euclidean_distance(start, goal);
+				if ( distance > distance_tolerance)
+					w_cmd = 0;
+					v_cmd = move.translate(distance, max_v, K_v);
+				else
+					path_idx = path_idx + 1;
+					if(path_idx > length(path))
+						go = false;
+						path_idx = 1;
+						path_planned = false;
+						step_n = step_n + 1;
+					end
+					rotate = true;
+				end
 			end
+		else % no go
+			v_cmd = 0;
+			w_cmd = 0;
 		end
 	end
-    
     % a partir de aca el robot real o el simulador ejecutan v_cmd y w_cmd:
     
     if use_roomba       % para usar con el robot real
@@ -300,52 +312,58 @@ for idx = 2:numel(tVec)
     % localizado se actualiza esa pose estimada con el modelo de odometría,
     % deberiamos usar EKF o algo menos exigente para seguir corrigiendo la
     % estimacion.
-    if (idx == 2)
-        particles = pf.initialize_particles(n_particles,map);
-        regen_spread = var(particles);
-        init_spread_measure = norm(regen_spread);
-        best_pose = mean(particles,1);
-    elseif(localized == false)
-        [particles, weights] = pf.particle_filter(particles,...
-            dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
-            regen_rate, regen_spread, sampleTime, map);
-        best_pose = weights'*particles;
-        if(norm(regen_spread)>=init_spread_measure/10)
-            regen_spread = momentum*regen_spread;
-        end
-        if(norm(var(particles,weights))<0.05)
-            localized = true;
-			delete(s1)
-        end
-    end
+	if(go) % agregar varianza de los pesos
+		if (idx == 2)
+			particles = pf.initialize_particles(n_particles,map);
+			regen_spread = var(particles);
+			init_spread_measure = norm(regen_spread);
+			best_pose = mean(particles,1);
+		else
+		[particles, weights] = pf.particle_filter(particles,...
+			dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
+			regen_rate, regen_spread, sampleTime, map);
+		best_pose = weights'*particles;
+			if(norm(regen_spread)>=init_spread_measure/10)
+				regen_spread = momentum*regen_spread;
+			end
+			if(norm(var(particles,weights))<0.05)
+				localized = true;
+				delete(s1)
+				
+			end
+		end
+	end
     
     % actualizar visualizacion
     viz(pose(:,idx),ranges)
 	if(idx >= 3)
-		if(localized == false)
-			delete(s1);
-		end
-		
+		delete(s1);
 		delete(s2);
-		
+        delete(step_text);
+        delete(time_text);
 	end
 
-	if(localized == false)
-		figure(1); hold on;
-		s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
-		hold off;
-	end
+
+	figure(1); hold on;
+	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
+	hold off;
+
 	
 	figure(1); hold on;
 	spointA = scatter(point_a(1), point_a(2), '*k');
-	text(point_a(1), point_a(2), "point A");
+	text(point_a(1)-0.2, point_a(2)-0.2, "point A");
 	spointB = scatter(point_b(1), point_b(2), '*k');
-	text(point_b(1), point_b(2), "point B");
-	s2 = scatter(best_pose(1), best_pose(2), 'xk'3;
+	text(point_b(1)-0.2, point_b(2)-0.2, "point B");
+	s2 = scatter(best_pose(1), best_pose(2), 'xk');
     s2.SizeData = 36; s2.LineWidth = 2;
+    step_text = text(3, 3, "step:" + case_name);
+    time_text = text(3, 2.5, "time:" + time);
+
 	hold off;
-	
+    
     waitfor(r);
+    time = time + sampleTime;
+
 	
 end
 

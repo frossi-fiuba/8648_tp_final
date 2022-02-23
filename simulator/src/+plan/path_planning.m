@@ -1,16 +1,21 @@
-function path = path_planning(map, start, goal)
+function path = path_planning(map, start, goal, original_map)
 	% start y goal tienen que ser del mundo.
 	
 % 	mapa:
-% 	viz = base.Visualizer2D;
-% 	viz.mapName = 'map';
-% 	viz(start);
-% 	viz([goal,0]');
+    figure(2);hold on;
+    show(original_map)
+	%viz = base.Visualizer2D;
+	%viz.mapName = 'map';
+
+	%viz([start,0]');
+	%viz([goal,0]');
+	scatter(start(1), start(2));
+    scatter(goal(1), goal(2))
 
 	disp 'starting path planning'
 	
 	% cambio de World a Grid
-	start_point = start(1:2)';
+	start_point = start;
 	goal_point = goal;
 	start = world2grid(map, start_point);
 	goal = world2grid(map, goal);
@@ -69,7 +74,8 @@ function path = path_planning(map, start, goal)
 		
 		% pongo los parents en la lista cerrada
 		closed_list(parent_y,parent_x) = 1;
-% 		viz([grid2world(map, [parent_x, parent_y]), 0]);
+		%viz([grid2world(map, [parent_x, parent_y]), 0]);
+		%plot(grid2world(map, [parent_x, parent_y]), '*');
 		
 		% neighbors de los parents
 		n = plan.neighbors([parent_y, parent_x], map_size);
@@ -103,12 +109,14 @@ function path = path_planning(map, start, goal)
 	j=0;
 	path = zeros(prod(map_size), 2);
 	while previous_x(parent(1), parent(2))>=0
-% 		viz([grid2world(map,[parent(2), parent(1)]),0]);
-% 		viz([grid2world(map,goal),0]);
+		aux = grid2world(map,[parent(2), parent(1)])
+		scatter(aux(1), aux(2), '*');
+		aux = grid2world(map,goal)
+		scatter(aux(1), aux(2), '*');
 
-	% 	%for visualization: Plot goal again
+	% 	%for visualization: scatter goal again
 	% 	if(parent(1) == goal_y && parent(2) == goal_x)
-	% 		plot(grid2world(map,[goal(2), goal(1)]), 'g.');
+	% 		scatter(grid2world(map,[goal(2), goal(1)]), 'g.');
 	% 	end
 		j = j+1;
 		child_y = previous_y(parent(1), parent(2));
@@ -127,4 +135,5 @@ function path = path_planning(map, start, goal)
 	disp 'path cost: ', disp(costs(goal(2),goal(1)));
 	disp 'path length: ', disp(distance2);
 	disp 'number of nodes visited: ', disp(sum(closed_list(:)));
+	hold off;
 end
