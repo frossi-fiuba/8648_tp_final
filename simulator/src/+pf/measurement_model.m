@@ -34,21 +34,26 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		% add pi and compensate for lidar coordinates wrt robot coordinates
 		
         % get all indexes with non-NaN entries
-		NaN_idx_aux = find(~isnan(intersects(:,1,i)));
-		NaN_idx = find(~isnan(z_r(NaN_idx_aux)));
+		NaN_idx_intersects = find(~isnan(intersects(:,1,i)));
+		NaN_idx_measures = find(~isnan(z_r));
+
+		idx = NaN_idx_intersects(ismember(NaN_idx_intersects,NaN_idx_measures));
 
         % define a clean vector of intersections without NaNs
-		clean_intersects = intersects(NaN_idx,:,i);
+		clean_intersects = intersects(idx,:,i);
 		
         % define a clean x tensor corresponding to the clean intersections
-		clean_xtensor = x_tensor(NaN_idx,:,i);
-		% https://www.mathworks.com/help/robotics/ref/binaryoccupancymap.rayintersection.html con respecto del mapa lo devuelve entonces es -clean_xtensro?
+		clean_xtensor = x_tensor(idx,:,i);
 		
         % calculate a clean distance between intersections and particle
 		clean_dist = sqrt(sum((clean_intersects-clean_xtensor).^2,2));
-		
+
+		if(isempty(clean_dist) == true)
+			weight(i) = 0;
+		else
 		% compute weight of particle using gaussian distribution
-		weight(i) = weight(i).*mean(normpdf(clean_dist-z_r(NaN_idx),0,sigma), 1)';
+		weight(i) = weight(i).*mean(normpdf(clean_dist-z_r(idx),0,sigma), 1)';
+		end
 	end
 	
 end
