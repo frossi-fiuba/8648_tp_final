@@ -1,6 +1,6 @@
 %% Robot diferencial con lidar
 % Robotica Movil - 2021 2c
-close all
+%close all
 clear all
 
 % en MATLAB2020a funciona bien, ajustado para R2016b, los demas a pelearla...
@@ -86,16 +86,17 @@ is_rot = false;
 v_cmd = 0;
 w_cmd = 0;
 
-est_grid = 0.5*ones(250,250);
-est_pose = [2.5;2.5;-pi/2];
-est_map = occupancyMap(est_grid, 50);
+% est_grid = 0.5*ones(250,250);
+best_pose = [0;0;0];
+% est_map = occupancyMap(est_grid, 50);
 %% Simulacion
 % f2 = figure(2);
 % f2.WindowState = "maximized";
 % scatter(est_pose(1), est_pose(2));
 % ha = gca();
 
-
+n_particles = 5;
+particles = zeros(size(best_pose,1), n_particles);
 
 if verMatlab.Release(1:5)=='(R201'
     r = robotics.Rate(1/sampleTime);    %matlab viejo no tiene funcion rateControl
@@ -151,15 +152,40 @@ for idx = 2:numel(tVec)
             ranges(not_valid<=chance_de_medicion_no_valida)=NaN;
         end
     end
-    %
+    
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
 	
-	%est_map = occupancyMap(4,4,50);
-	est_pose = est_pose + [v_cmd*cos(est_pose(3));v_cmd*sin(est_pose(3)); w_cmd]*sampleTime;
-	insertRay(est_map, est_pose, lidarScan(ranges,lidar.scanAngles), lidar.maxRange);
-	figure(1);
-	show(est_map);
+	% si es la primer iteracion genero las particulas
+	if(idx == 2)
+		[particles, maps] = mcl.initialize_particles(n_particles, ranges, lidar.scanAngles,...
+			lidar.maxRange, 250, 250, 50);
+	end
+	
+	% actualizo mapa con mediciones del lidar
+	%insertRay(est_map, est_pose, lidarScan(ranges,lidar.scanAngles), lidar.maxRange);
+	
+	% estimo las poses de las particulas con el modelo de odometria
+	% est_pose = est_pose + [v_cmd*cos(est_pose(3)); v_cmd*sin(est_pose(3)); w_cmd]*sampleTime;
+	particles = particles + ...
+		[v_cmd*cos(particles(3,:)); v_cmd*sin(particles(3,:)); repmat(w_cmd,1,size(particles,2))]*sampleTime;
+	
+	weights = mcl.measurement_model(ranges, lidar.scanAngles, lidar.maxRange, particles', maps);
+	
+	if(idx > 2)
+		for i=1:n_particles
+% 			lidar_offset = [0.09*cos(particles(3,i));0.09*sin(particles(3,i));0];
+% 			intersect = rayIntersection(maps(i), particles(:,i) + lidar_offset,...
+% 			lidar.scanAngles, lidar.maxRange);
+			insertRay(maps(i), particles(:,i), lidarScan(ranges, lidar.scanAngles), lidar.maxRange);
+		end
+	end
+	
+	best_pose = best_pose + particles*weights;
+	
+	% muestro
+% 	figure(1);
+% 	show(est_map);
 	
 	% uso lidar y mejoro poses
 	% chequeo que no tenga obstaculos
@@ -209,7 +235,18 @@ for idx = 2:numel(tVec)
 	end
 
     % actualizar visualizacion
+	if(idx > 2)
+		delete(s)
+	end
+	
     viz(pose(:,idx),ranges)
+	hold on; s = scatter(best_pose(1), best_pose(2), 'xk');
+	s.SizeData = 36; s.LineWidth = 2; hold off;
+	
+% 	for i = 1:n_particles
+% 		figure(i+1);
+% 		show(maps(i));
+% 	end
 	
     waitfor(r);
 	
