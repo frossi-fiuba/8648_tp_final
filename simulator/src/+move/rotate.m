@@ -1,14 +1,17 @@
-function w_cmd = rotate(speed, angle, clockwise)
+function w_cmd = rotate(diff_angle, max_w, K)
 
-if clockwise:
-    w_cmd = -abs(speed);
-else:
-    w_cmd = abs(speed);
-end
-%myFun - Description
-%
-% Syntax: output = myFun(input)
-%
-% Long description
-    
+    % revisar;
+    ang_speed = K*abs(diff_angle);
+
+    clockwise = (diff_angle > 0);
+
+    if clockwise
+        w_cmd = -abs(ang_speed);
+    else
+        w_cmd = abs(ang_speed);
+    end
+
+    if (abs(w_cmd) > max_w)
+        w_cmd = max_w * w_cmd / abs(w_cmd);
+    end
 end
