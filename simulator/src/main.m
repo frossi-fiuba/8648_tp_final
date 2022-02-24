@@ -67,7 +67,7 @@ viz = base.Visualizer2D;
 viz.mapName = 'map';
 viz.robotRadius = robot_R;
 attachLidarSensor(viz,lidar);
-end
+
 %%
 
 % Celdas libres (el robot pude arrancar en cualquier lugar valido del mapa)
@@ -77,24 +77,22 @@ free_cells = [free_cells_x, free_cells_y];
 n_free_cells = length(free_cells);
 selected_cell = randi([1, n_free_cells]);
 
+initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
+%initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
+%initPose = [1; 3; 0];
+end
 % Parametros de la Simulacion
 
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
-%initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
-initPose = [1; 3; 0];
 
 point_a = [3, 1];
 point_b = [1.1, 2.85];
 
+% CONV MAP
 inflate_radius = robot_R * 1;
 gaussian_filter_variance = 1.5;
-
-% CONV MAP
 conv_map = plan.convolve_map(map, inflate_radius, gaussian_filter_variance);
-% path = [smooth(path(:,1)), smooth(path(:,2))]; 
-
 path_to_b = plan.path_planning(conv_map, point_a, point_b, map);
 % ORIGINAL MAP
 %path = plan.path_planning(map, initPose, goal);
@@ -106,9 +104,7 @@ tVec = 0:sampleTime:simulationDuration;         % Vector de Tiempo para duracion
 pose = zeros(3,numel(tVec));    
 pose(:,1) = initPose;
 
-% cantidad de particulas
-n_particles = 180;
-old_best_pose = zeros(1,3);
+
 
 %% Simulacion
 
@@ -119,15 +115,19 @@ else
 end
 
 % particle filter params
+n_particles = 180; % cantidad de particulas
 regen_rate = floor(0.1*n_particles); % cantidad de particulas que se regeneran
 momentum = 0.9;
-localized = false;
 is_obs = false;
 is_rot = false;
+loc_th = 0.05; % localization variance of particles threshold
+% flags of movement
 path_planned = false;
+localized = false;
+go = true;
+path_idx = 1; % path selection
 
 % movement params
-path_idx = 1; % idx for the path step
 distance_tolerance = 0.2; % tolerancia en la distancia del robot al centro de la celda para decir que ya llego a la celda.
 angle_tolerance = pi/8; % tolerancia de angulo para decir que ya esta mirando a la celda
 rotate = true; % si es true, rota, si no se translada.
@@ -137,33 +137,23 @@ max_v = 0.29; % maxima velocidad lineal, satura a esta velocidad si quiere ir ma
 max_w = 1; % maxima velocidad angular, satura a esta velocidad si quiere ir mas rapido.
 
 time_running = 0;
-go = true;
+
 % inicializamos las velocidades en cero.
 v_cmd = 0; 
 w_cmd = 0;
-
+% 4 pasos, localizar; ir al punto A; esperar; ir al punto B.
 step_n = 1;
 case_name = "localization";
+% tiempo ficticio de simulacion
 time = 0;
-
-loc_th = 0.05; % localization variance of particles threshold
 
 %tic
 
+% inicializamos las particulas.
 particles = pf.initialize_particles(n_particles,map);
 regen_spread = var(particles);
 init_spread_measure = norm(regen_spread);
 best_pose = mean(particles,1);
-
-time_move = 0;
-iter_move = 0;
-time_irfe = 0;
-iter_irfe = 0;
-time_obstacle_det = 0;
-time_pf = 0;
-iter_pf = 0;
-time_viz = 0; 
-
 
 for idx = 2:numel(tVec)   
 	% set movement. vcmd, wcmd
@@ -191,7 +181,7 @@ for idx = 2:numel(tVec)
 		end
 		
 		% 1 roto hasta el angulo.
-		start = pose(:, idx-1);
+		start = best_pose;
 		goal = path(path_idx, :);
 
 		x_0 = start(1);
@@ -203,8 +193,6 @@ for idx = 2:numel(tVec)
 
 		
 		if(go && localized)
-			tic
-            iter_move = iter_move + 1;
 			if (rotate)
 				goal_angle = atan2(y_1-y_0, x_1-x_0);
 				diff_angle = angdiff(goal_angle, theta_0);
@@ -238,7 +226,6 @@ for idx = 2:numel(tVec)
 					rotate = true;
 				end
 			end
-			time_move = time_move + toc;
 		else % no go
 			v_cmd = 0;
 			w_cmd = 0;
@@ -294,7 +281,6 @@ for idx = 2:numel(tVec)
 
     % Aca el robot ya ejecuto las velocidades comandadas y devuelve en la
     % variables ranges la medicion del lidar para ser usada.
-	tic
 	% chequeo que no tenga obstaculos
 	z_t = lidar.scanAngles;
 	[min_ranges, min_idx] = min(ranges);
@@ -309,7 +295,6 @@ for idx = 2:numel(tVec)
 	else
 		is_obs = false;
 	end
-	time_obstacle_det = time_obstacle_det + toc;
 	% IRFE (Initial Random Free Exploration)
 	% si no esta localizado, ejecutar IRFE.
 	
@@ -320,8 +305,6 @@ for idx = 2:numel(tVec)
 		if(is_obs == true)
 			% si no esta rotando genera un w
 			if(is_rot == false)
-				tic
-                iter_irfe = iter_irfe + 1;
 				% el w se genera segun los obstaculos que detecte...
 				% si detecto que hay obstaculos en ambas direcciones,
 				% giro aleatorio
@@ -336,7 +319,6 @@ for idx = 2:numel(tVec)
 				end
 				is_rot = true;
 				% si estaba rotando que siga rotando
-				time_irfe = time_irfe + toc;
 			end
 		% si no esta obstaculizado, que se mueva en direccion lineal
 		else
@@ -352,10 +334,7 @@ for idx = 2:numel(tVec)
     % estimacion.
 	
 	if(go) % agregar varianza de los pesos
-		tic
-        iter_pf = iter_pf + 1;
 		% update particles
-		
 		[particles, weights] = pf.particle_filter(particles,...
 			dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
 			regen_rate, regen_spread, sampleTime, map);
@@ -368,51 +347,39 @@ for idx = 2:numel(tVec)
 		if (norm(var(particles,weights)) < loc_th)
 			localized = true;
 		end
-		time_pf = time_pf + toc;
 	end
-	
-    tic
-    % actualizar visualizacion
-        viz(pose(:,idx),ranges)
-        if(idx >= 3)
-            delete(s1);
-            delete(s2);
-            delete(step_text);
-            delete(time_text);
-        end
+
+	%VIZ ON/OFF
+	if(~use_roomba)
+		% actualizar visualizacion
+		viz(pose(:,idx),ranges)
+		if(idx >= 3)
+			delete(s1);
+			delete(s2);
+			delete(step_text);
+			delete(time_text);
+		end
 
 
-	figure(1); hold on;
-	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
-	hold off;
+		figure(1); hold on;
+		s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
+		hold off;
 
-	
-	figure(1); hold on;
-	spointA = scatter(point_a(1), point_a(2), '*k');
-	text(point_a(1)-0.2, point_a(2)-0.2, "point A");
-	spointB = scatter(point_b(1), point_b(2), '*k');
-	text(point_b(1)-0.2, point_b(2)-0.2, "point B");
-	s2 = scatter(best_pose(1), best_pose(2), 'xk');
-    s2.SizeData = 36; s2.LineWidth = 2;
-    step_text = text(3, 3, "step:" + case_name);
-    time_text = text(3, 2.5, "time:" + time);
+		
+		figure(1); hold on;
+		spointA = scatter(point_a(1), point_a(2), '*k');
+		text(point_a(1)-0.2, point_a(2)-0.2, "point A");
+		spointB = scatter(point_b(1), point_b(2), '*k');
+		text(point_b(1)-0.2, point_b(2)-0.2, "point B");
+		s2 = scatter(best_pose(1), best_pose(2), 'xk');
+		s2.SizeData = 36; s2.LineWidth = 2;
+		step_text = text(3, 3, "step:" + case_name);
+		time_text = text(3, 2.5, "time:" + time);
 
-	hold off;
-    time_viz = time_viz + toc;
+		hold off;
+	end
 
     waitfor(r);
     time = time + sampleTime;
 
 end
-
-
-display("time MOVE")
-time_move / iter_move
-display("time IRFE")
-time_irfe / iter_irfe
-display("time OBST_DET")
-time_obstacle_det / idx
-display("time PF")
-time_pf / iter_pf
-display("time VIZ")
-time_viz / idx
