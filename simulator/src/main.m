@@ -67,7 +67,7 @@ viz = base.Visualizer2D;
 viz.mapName = 'map';
 viz.robotRadius = robot_R;
 attachLidarSensor(viz,lidar);
-
+end
 %%
 
 % Celdas libres (el robot pude arrancar en cualquier lugar valido del mapa)
@@ -78,14 +78,13 @@ n_free_cells = length(free_cells);
 selected_cell = randi([1, n_free_cells]);
 
 initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
-%initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
+initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
 %initPose = [1; 3; 0];
-end
-% Parametros de la Simulacion
 
+% Parametros de la Simulacion
 simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
-
+% targets
 point_a = [3, 1];
 point_b = [1.1, 2.85];
 
@@ -93,7 +92,8 @@ point_b = [1.1, 2.85];
 inflate_radius = robot_R * 1;
 gaussian_filter_variance = 1.5;
 conv_map = plan.convolve_map(map, inflate_radius, gaussian_filter_variance);
-path_to_b = plan.path_planning(conv_map, point_a, point_b, map);
+%path_to_b = load('../paths/path_to_b.mat').path_to_b;
+%path_to_b = plan.path_planning(conv_map, point_a, point_b, map);
 % ORIGINAL MAP
 %path = plan.path_planning(map, initPose, goal);
 
@@ -163,7 +163,8 @@ for idx = 2:numel(tVec)
 			switch step_n
 				case 1
 					case_name = "Going to point A";
-					path = plan.path_planning(conv_map, best_pose(1:2), point_a, map);
+                    current_goal = point_a;
+					path = plan.path_planning(conv_map, best_pose(1:2), current_goal, map);
                     path_planned = true;
 				case 2
 					case_name = "Awaiting on point A";
@@ -173,8 +174,11 @@ for idx = 2:numel(tVec)
 					end
 				case 3
 					case_name = "Going to point B";
+                    current_goal = point_b;
+					path = plan.path_planning(conv_map, best_pose(1:2), current_goal, map);
+					%path = path_to_b; %plan.path_planning(conv_map, best_pose', point_b);%
 					go = true;
-					path = path_to_b; %plan.path_planning(conv_map, best_pose', point_b);%
+					%
                     path_planned = true;
 			end
 			
@@ -211,16 +215,16 @@ for idx = 2:numel(tVec)
 					v_cmd = move.translate(distance, max_v, K_v);
 				else
 					path_idx = path_idx + 1;
-					if(path_idx > length(path))
+					if(move.euclidean_distance(start, current_goal) <= robot_R || path_idx > length(path))
 						go = false;
 						path_idx = 1;
 						path_planned = false;
 						step_n = step_n + 1;
                         if(step_n == 4)
+                            v_cmd = 0;
+                            w_cmd = 0;
 							break;
-                            % full_time = toc;
-                            % display("TIME TAKEN WAS");
-                            % display(full_time);
+
                         end
 					end
 					rotate = true;
@@ -337,7 +341,7 @@ for idx = 2:numel(tVec)
 		% update particles
 		[particles, weights] = pf.particle_filter(particles,...
 			dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
-			regen_rate, regen_spread, sampleTime, map);
+			regen_rate, regen_spread, sampleTime, map, localized);
 
 		best_pose = weights'*particles;
 		% si regen spread (varianzas de cada coordenada) si se empiezan a clusterear accelera el algoritmo
@@ -346,6 +350,10 @@ for idx = 2:numel(tVec)
 		end
 		if (norm(var(particles,weights)) < loc_th)
 			localized = true;
+			n_particles = 45;
+			[~, best_w_idx] = sort(weights, 'descend');
+			regen_rate = floor(0.1*n_particles);
+			particles = particles(best_w_idx(1:20), :);
 		end
 	end
 

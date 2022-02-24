@@ -1,5 +1,5 @@
 function [new_particles, weights] = particle_filter(particles, dd, v_cmd, w_cmd,...
-	z_r, z_t, lidar_maxrange, regen_rate, regen_spread, timestep, map)
+	z_r, z_t, lidar_maxrange, regen_rate, regen_spread, timestep, map, localized)
 %[new_particles, weights]=pf.particle_filter(particles, dd, v_cmd, w_cmd,
 %   z_r, z_t, lidar_maxrange, regen_rate, regen_spread, timestep, map)
 %
@@ -28,7 +28,7 @@ function [new_particles, weights] = particle_filter(particles, dd, v_cmd, w_cmd,
     normalizer = sum(weights);
     weights = weights ./ normalizer;
     % resample particles
-    new_particles = pf.resample(new_particles, weights, regen_rate, regen_spread, map);
+    new_particles = pf.resample(new_particles, weights, regen_rate, regen_spread, map, localized);
     
 end
 

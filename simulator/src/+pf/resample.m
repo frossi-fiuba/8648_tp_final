@@ -1,4 +1,4 @@
-function new_particles = resample(particles, weights, regen_rate, regen_spread, map)
+function new_particles = resample(particles, weights, regen_rate, regen_spread, map, localized)
     % Returns a new set of particles obtained by performing
     % stochastic universal sampling.
     %
@@ -30,7 +30,11 @@ function new_particles = resample(particles, weights, regen_rate, regen_spread, 
 	[~, surv_idx] = unique(new_particles, 'row');
     
     dead_particles = M-size(surv_idx,1);
-    unif_particles = ceil(dead_particles/4);
+    if (localized)
+        unif_particles = 0;
+    else
+        unif_particles = ceil(dead_particles/4);
+    end
     norm_particles = dead_particles - unif_particles;
     mean_particles = weights'*particles;
     xlims = map.XLocalLimits;
