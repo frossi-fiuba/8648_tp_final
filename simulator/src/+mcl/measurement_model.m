@@ -1,4 +1,4 @@
-function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
+function weight = measurement_model(z_r, z_t, lidar_maxRange, x, maps)
     % weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
     % Computes the observation likelihood of all particles.
     % The employed sensor model is range only.
@@ -7,12 +7,12 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 	% z_t: set of lidar angles (array of angles)
     % lidar_maxRange: maximum range of lidar
     % x: set of current particles
-    % map: map of the environment (OccupancyGrid object)
+    % maps: map of the environment of each particle (OccupancyGrid object)
 	
     % variance for measures comparation
     sigma = 0.2;
     % initialization of weights
-    weight = ones(size(x, 1), 1);
+    weight = zeros(size(x, 1), 1);
     % intialization of ray projection
 	intersects = zeros(length(z_t),2,size(x, 1));
 	
@@ -29,9 +29,8 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		%lidar_offset = [0.09, 0, 0] % from the robot perspective, in meters
 		lidar_offset = [0.09*cos(x(i,3)),0.09*sin(x(i,3)),0]; % in meters 
 		
-		intersects(:,:,i) = rayIntersection(map(i), x(i,:) + lidar_offset,...
+		intersects(:,:,i) = rayIntersection(maps(i), x(i,:) + lidar_offset,...
 			z_t, lidar_maxRange);
-		% add pi and compensate for lidar coordinates wrt robot coordinates
 		
         % get all indexes with non-NaN entries
 		NaN_idx_intersects = find(~isnan(intersects(:,1,i)));
@@ -43,7 +42,6 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		
         % define a clean x tensor corresponding to the clean intersections
 		clean_xtensor = x_tensor(idx,:,i);
-		% https://www.mathworks.com/help/robotics/ref/binaryoccupancymap.rayintersection.html con respecto del mapa lo devuelve entonces es -clean_xtensro?
 		
         % calculate a clean distance between intersections and particle
 		clean_dist = sqrt(sum((clean_intersects-clean_xtensor).^2,2));
@@ -51,8 +49,9 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, map)
 		if(isempty(clean_dist) == true)
 			weight(i) = 0;
 		else
+
 		% compute weight of particle using gaussian distribution
-		weight(i) = weight(i).*mean(normpdf(clean_dist-z_r(idx),0,sigma), 1)';
+		weight(i) = mean(normpdf(clean_dist-z_r(idx),0,sigma), 1)';
 		end
 	end
 	

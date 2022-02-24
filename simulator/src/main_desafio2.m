@@ -95,15 +95,21 @@ best_pose = [0;0;0];
 % scatter(est_pose(1), est_pose(2));
 % ha = gca();
 
-n_particles = 5;
+n_particles = 15;
+n_candidates = 15;
+sigma_candidates = [0.1,0.1,0.1];
 particles = zeros(size(best_pose,1), n_particles);
+
+map_size_x = 350;
+map_size_y = 350;
+map_resolution = 50;
 
 if verMatlab.Release(1:5)=='(R201'
     r = robotics.Rate(1/sampleTime);    %matlab viejo no tiene funcion rateControl
 else
     r = rateControl(1/sampleTime);  %definicion para R2020a, y posiblemente cualquier version nueva
 end
-for idx = 2:numel(tVec)   
+for idx = 2:numel(tVec)
 
 	% velocidades iniciales?
     
@@ -159,33 +165,44 @@ for idx = 2:numel(tVec)
 	% si es la primer iteracion genero las particulas
 	if(idx == 2)
 		[particles, maps] = mcl.initialize_particles(n_particles, ranges, lidar.scanAngles,...
-			lidar.maxRange, 250, 250, 50);
+			lidar.maxRange, map_size_x, map_size_y, map_resolution);
 	end
 	
 	% actualizo mapa con mediciones del lidar
-	%insertRay(est_map, est_pose, lidarScan(ranges,lidar.scanAngles), lidar.maxRange);
+	% insertRay(est_map, est_pose, lidarScan(ranges,lidar.scanAngles), lidar.maxRange);
 	
 	% estimo las poses de las particulas con el modelo de odometria
 	% est_pose = est_pose + [v_cmd*cos(est_pose(3)); v_cmd*sin(est_pose(3)); w_cmd]*sampleTime;
+	old_particles = particles;
 	particles = particles + ...
 		[v_cmd*cos(particles(3,:)); v_cmd*sin(particles(3,:)); repmat(w_cmd,1,size(particles,2))]*sampleTime;
 	
 	weights = mcl.measurement_model(ranges, lidar.scanAngles, lidar.maxRange, particles', maps);
 	
+ 	particles = mcl.scan_match(particles, old_particles, ranges,...
+ 		lidar.scanAngles, lidar.maxRange, [v_cmd, w_cmd], maps, sampleTime,...
+		sigma_candidates, n_candidates);
+	
+	% detect NaN weights, if so they are discarded (weight set to zero)
+	weights(isnan(weights)) = 0;
+	
+	% normalize the weights
+    normalizer = sum(weights);
+    weights = weights ./ normalizer;
+	
+	% update the maps
 	if(idx > 2)
 		for i=1:n_particles
-% 			lidar_offset = [0.09*cos(particles(3,i));0.09*sin(particles(3,i));0];
-% 			intersect = rayIntersection(maps(i), particles(:,i) + lidar_offset,...
-% 			lidar.scanAngles, lidar.maxRange);
-			insertRay(maps(i), particles(:,i), lidarScan(ranges, lidar.scanAngles), lidar.maxRange);
+			insertRay(maps(i), particles(:,i),...
+				lidarScan(ranges, lidar.scanAngles), lidar.maxRange);
 		end
 	end
 	
-	best_pose = best_pose + particles*weights;
+	% update the pose
+	best_pose = particles*weights;
 	
-	% muestro
-% 	figure(1);
-% 	show(est_map);
+	% resample
+	[particles, maps] = mcl.resample(particles, weights, maps);
 	
 	% uso lidar y mejoro poses
 	% chequeo que no tenga obstaculos
@@ -248,6 +265,10 @@ for idx = 2:numel(tVec)
 % 		show(maps(i));
 % 	end
 	
+	[~,indx] = max(weights);
+	figure(2)
+	show(maps(indx))
+
     waitfor(r);
 	
 end
