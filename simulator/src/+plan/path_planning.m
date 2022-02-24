@@ -1,4 +1,4 @@
-function path = path_planning(map, start, goal, original_map)
+function path = path_planning(map, start_point, goal_point, original_map)
 	% start y goal tienen que ser del mundo.
 	
 % 	mapa:
@@ -9,16 +9,14 @@ function path = path_planning(map, start, goal, original_map)
 
 	%viz([start,0]');
 	%viz([goal,0]');
-	scatter(start(1), start(2));
-    scatter(goal(1), goal(2))
+	scatter(start_point(1), start_point(2));
+    scatter(goal_point(1), goal_point(2));
 
 	disp 'starting path planning'
 	
 	% cambio de World a Grid
-	start_point = start;
-	goal_point = goal;
 	start = world2grid(map, start_point);
-	goal = world2grid(map, goal);
+	goal = world2grid(map, goal_point);
 	goal_y = goal(2);
 	goal_x = goal(1);
 

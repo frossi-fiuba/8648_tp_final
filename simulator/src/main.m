@@ -83,7 +83,7 @@ simulationDuration = 3*60;          % Duracion total [s]
 sampleTime = 0.1;                   % Sample time [s]
 initPose = [grid2world(map, free_cells(selected_cell, :)), 2*pi*rand;]; % Pose inicial (x y theta) del robot simulado
 %initPose = [2; 2.5; -pi/2];			% Pose inicial (x y theta) del robot simulado
-initPose = [1; 3; 0];
+%initPose = [1; 3; 0];
 
 point_a = [3, 1];
 point_b = [1.1, 2.85];
@@ -162,8 +162,19 @@ iter_irfe = 0;
 time_obstacle_det = 0;
 time_pf = 0;
 iter_pf = 0;
-time_viz = 0; 
+time_viz = 0;
 
+% Make librobotics available
+addpath('librobotics');
+
+% Initialize belief (de mentira... dsp hay que inicializarlo para como termina el particle filter)
+initPose = [point_a, 0];
+step_n = 3;
+mu = initPose;
+sigma = eye(3);
+localized = true;
+pose(:,1) = initPose;
+%best_pose = initPose'; % esto es hardcode
 
 for idx = 2:numel(tVec)   
 	% set movement. vcmd, wcmd
@@ -346,31 +357,40 @@ for idx = 2:numel(tVec)
 		end
 	end
     
+	if(localized)
+		[mu, sigma] = ekf.extended_kalman_filter(mu, sigma, vel*sampleTime, ranges, lidar.scanAngles, lidar.maxRange, map); % vel*sampleTime es la odometria del paso...
+		figure(gcf); hold on;
+		elipse = ekf.drawprobellipse(mu, sigma, 0.6, 'r');
+        mu
+        mean_ekf = scatter(mu(1), mu(2), '*');
+		hold off;
+	end
     % si esta deslocalizado se ejecuta un filtro de particulas, si esta
     % localizado se actualiza esa pose estimada con el modelo de odometría,
     % deberiamos usar EKF o algo menos exigente para seguir corrigiendo la
     % estimacion.
 	
-	if(go) % agregar varianza de los pesos
-		tic
-        iter_pf = iter_pf + 1;
-		% update particles
+	%% %DESCOMENTAR
+	% if(go) % agregar varianza de los pesos
+	% 	tic
+    %     iter_pf = iter_pf + 1;
+	% 	% update particles
 		
-		[particles, weights] = pf.particle_filter(particles,...
-			dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
-			regen_rate, regen_spread, sampleTime, map);
+	% 	[particles, weights] = pf.particle_filter(particles,...
+	% 		dd, v_cmd, w_cmd, ranges, lidar.scanAngles, lidar.maxRange,...
+	% 		regen_rate, regen_spread, sampleTime, map);
 
-		best_pose = weights'*particles;
-		% si regen spread (varianzas de cada coordenada) si se empiezan a clusterear accelera el algoritmo
-		if(norm(regen_spread)>=init_spread_measure/10)
-			regen_spread = momentum*regen_spread;
-		end
-		if (norm(var(particles,weights)) < loc_th)
-			localized = true;
-		end
-		time_pf = time_pf + toc;
-	end
-	
+	% 	best_pose = weights'*particles;
+	% 	% si regen spread (varianzas de cada coordenada) si se empiezan a clusterear accelera el algoritmo
+	% 	if(norm(regen_spread)>=init_spread_measure/10)
+	% 		regen_spread = momentum*regen_spread;
+	% 	end
+	% 	if (norm(var(particles,weights)) < loc_th)
+	% 		localized = true;
+	% 	end
+	% 	time_pf = time_pf + toc;
+	% end
+	%%% FIN DESCOMENTAR
     tic
     % actualizar visualizacion
         viz(pose(:,idx),ranges)
@@ -386,7 +406,8 @@ for idx = 2:numel(tVec)
 	s1 = scatter(particles(:,1),particles(:,2), 4, 'r', 'filled');
 	hold off;
 
-	
+	delete(elipse)
+    delete(mean_ekf)
 	figure(1); hold on;
 	spointA = scatter(point_a(1), point_a(2), '*k');
 	text(point_a(1)-0.2, point_a(2)-0.2, "point A");
