@@ -29,8 +29,20 @@ function weight = measurement_model(z_r, z_t, lidar_maxRange, x, maps)
 		%lidar_offset = [0.09, 0, 0] % from the robot perspective, in meters
 		lidar_offset = [0.09*cos(x(i,3)),0.09*sin(x(i,3)),0]; % in meters 
 		
-		intersects(:,:,i) = rayIntersection(maps(i), x(i,:) + lidar_offset,...
+		if(or(x(i,1)+lidar_offset(1)>maps(i).XLocalLimits(2) || x(i,1)+lidar_offset(1)<maps(i).XLocalLimits(1),...
+				x(i,2)+lidar_offset(2)>maps(i).YLocalLimits(2) || x(i,2)+lidar_offset(2)<maps(i).YLocalLimits(1)))
+			weight(i) = 0;
+			%disp("fuera");
+			continue;
+		elseif (getOccupancy(maps(i), x(i,1:2)) > maps(i).OccupiedThreshold)
+			%disp(x(i,:));
+			weight(i) = 0;
+			%disp("ocupad");
+			continue;
+		else
+			intersects(:,:,i) = rayIntersection(maps(i), x(i,:) + lidar_offset,...
 			z_t, lidar_maxRange);
+		end
 		
         % get all indexes with non-NaN entries
 		NaN_idx_intersects = find(~isnan(intersects(:,1,i)));

@@ -272,4 +272,8 @@ for idx = 2:numel(tVec)
     waitfor(r);
 	
 end
+
+[~,i] = max(weights);
+est_map = maps(i);
+save estimated_map.mat est_map
   
