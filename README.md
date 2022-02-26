@@ -2,7 +2,7 @@
 
 Autores: Leonel Mendoza, Denise Gayet, Francisco Rossi.
 
-Se puede encontrar la consigna y la resolución del trabajo práctico final de la materia 86.48 - Robótica Móvil.
+Se puede encontrar la consigna y la resolución del trabajo práctico final de la materia 86.48 - Robótica Móvil. Todo el codigo fue desarrollado entorno al simulador dentro de la carpeta simulator/src/
 
 ## Ejercicio 1 `main.m`
 
