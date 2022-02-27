@@ -49,7 +49,7 @@ La localización o no del robot se define a partir de la varianza de la distribu
 
 ### Introducción
 
-El desafío planteado en este ejercicio consiste en que el robot aparece en un lugar desconocido, y el robot debe conseguir de alguna manera un mapa del entorno. Dado quue no existe un mapa, ni tenes forma de localizar al robot a priori en ese mapa, este problema resoluble vía SLAM (Simultaneous Localization And Mapping).
+El desafío planteado en este ejercicio consiste en que el robot aparece en un lugar desconocido, y el robot debe conseguir de alguna manera un mapa del entorno. Dado que no existe un mapa, ni tenes forma de localizar al robot a priori en ese mapa, este problema resoluble vía SLAM (Simultaneous Localization And Mapping).
 
 ### Desarrollo
 
